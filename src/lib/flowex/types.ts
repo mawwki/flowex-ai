@@ -1,5 +1,5 @@
 export type Scene = {
-  /** JS code that defines: function drawFrame(ctx, t, w, h) {} or const SCENES = [...] */
+  /** JS code that defines: function drawFrame(ctx, t, w, h) {} plus optional CONFIG / SCENES */
   js: string;
   /** optional CSS applied to the stage wrapper */
   css: string;
@@ -12,7 +12,9 @@ export type AssetKind = "image" | "video" | "audio";
 export type Asset = {
   id: string;
   kind: AssetKind;
+  /** short slug the scene code uses: ASSETS.logo */
   name: string;
+  fileName: string;
   mime: string;
   /** seconds, for audio/video */
   duration?: number;
@@ -27,6 +29,15 @@ export type AudioClip = {
   start: number;
   volume: number;
   muted: boolean;
+  /** voiceover recorded in the app */
+  voice?: boolean;
+};
+
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  at: number;
 };
 
 export type Project = {
@@ -37,20 +48,19 @@ export type Project = {
   width: number;
   height: number;
   quality: string; // label e.g. "4K HDR"
+  /** aspect preset id: "16:9" | "9:16" | "1:1" */
+  aspect: string;
   scene: Scene;
+  /** user overrides applied over the scene CONFIG */
+  config: Record<string, string | number | boolean>;
   assets: Asset[];
   audio: AudioClip[];
+  /** AI-authored follow-up ideas shown above the prompt bar */
   suggestions: string[];
+  styleId?: string;
   messages: ChatMessage[];
   createdAt: number;
   updatedAt: number;
-};
-
-export type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  at: number;
 };
 
 export type ProviderId =
