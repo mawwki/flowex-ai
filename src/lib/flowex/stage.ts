@@ -1,7 +1,32 @@
 import type { Project } from "./types";
+import { FX_RUNTIME } from "./fx";
+import { overrideSnippet } from "./config";
+
+export type AssetUrlMap = Record<string, string>;
+
+/** Code that builds the ASSETS map inside the sandbox. */
+function assetsSnippet(project: Project, urls: AssetUrlMap): string {
+  const list = project.assets
+    .filter((a) => a.kind !== "audio" && urls[a.id])
+    .map((a) => ({ name: a.name, kind: a.kind, url: urls[a.id]! }));
+  return `
+var ASSETS={};
+var __assetDefs=${JSON.stringify(list)};
+(function(){
+  for(var i=0;i<__assetDefs.length;i++){
+    var d=__assetDefs[i],el;
+    if(d.kind==='video'){el=document.createElement('video');el.muted=true;el.playsInline=true;el.preload='auto';el.loop=true;}
+    else{el=document.createElement('img');}
+    el.crossOrigin='anonymous';el.src=d.url;
+    ASSETS[d.name]=el;
+  }
+})();
+function getAsset(n){return ASSETS[n]||null;}
+`;
+}
 
 /** Builds the sandboxed (same-origin) document that renders the scene on a canvas. */
-export function buildStageDoc(project: Project): string {
+export function buildStageDoc(project: Project, urls: AssetUrlMap = {}): string {
   const { scene, width, height, duration, fps } = project;
   return `<!doctype html><html><head><meta charset="utf-8"/><style>
 html,body{margin:0;height:100%;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center}
@@ -12,15 +37,29 @@ ${scene.css}
 </style></head><body>
 <div id="stage"><canvas id="c" width="${width}" height="${height}"></canvas><div id="overlay">${scene.html}</div></div>
 <script>
+${FX_RUNTIME}
 var __err=null;
 try{
+${assetsSnippet(project, urls)}
 ${scene.js}
+${overrideSnippet(project.config)}
 }catch(e){__err=String(e);}
 (function(){
   var c=document.getElementById('c');
   var ctx=c.getContext('2d');
   var DUR=${duration}, FPS=${fps};
   var t=0, playing=false, last=null;
+  function syncVideos(){
+    try{
+      for(var k in ASSETS){
+        var el=ASSETS[k];
+        if(el&&el.tagName==='VIDEO'&&el.duration){
+          if(playing){ if(el.paused)el.play().catch(function(){}); }
+          else { el.pause(); el.currentTime=t%el.duration; }
+        }
+      }
+    }catch(e){}
+  }
   function paint(){
     ctx.setTransform(1,0,0,1,0,0);
     if(__err||typeof drawFrame!=='function'){
@@ -46,9 +85,9 @@ ${scene.js}
   window.addEventListener('message',function(e){
     var d=e.data||{};
     if(d.source!=='flowex-host')return;
-    if(d.type==='play'){playing=true;last=null;}
-    if(d.type==='pause'){playing=false;last=null;}
-    if(d.type==='seek'){t=Math.max(0,Math.min(DUR,d.t));playing=false;last=null;paint();
+    if(d.type==='play'){playing=true;last=null;syncVideos();}
+    if(d.type==='pause'){playing=false;last=null;syncVideos();}
+    if(d.type==='seek'){t=Math.max(0,Math.min(DUR,d.t));last=null;syncVideos();paint();
       parent.postMessage({source:'flowex',type:'time',t:t},'*');}
     if(d.type==='renderAt'){t=d.t;paint();}
   });
@@ -57,7 +96,7 @@ ${scene.js}
 <\/script></body></html>`;
 }
 
-/** Renders a still frame of the scene to an offscreen canvas (for thumbnails / export). */
+/** Renders a still frame of the scene to an offscreen canvas (thumbnails). */
 export function renderThumb(project: Project, t: number, w = 160): string {
   if (typeof document === "undefined") return "";
   const h = Math.round((w * project.height) / project.width);
@@ -69,7 +108,11 @@ export function renderThumb(project: Project, t: number, w = 160): string {
   try {
     // eslint-disable-next-line no-new-func
     const fn = new Function(
-      `${project.scene.js}; return typeof drawFrame==='function'?drawFrame:null;`,
+      `${FX_RUNTIME}
+       var ASSETS={}; function getAsset(){return null;}
+       ${project.scene.js}
+       ${overrideSnippet(project.config)}
+       return typeof drawFrame==='function'?drawFrame:null;`,
     )() as ((c: CanvasRenderingContext2D, t: number, w: number, h: number) => void) | null;
     if (!fn) return "";
     fn(ctx, t, w, h);
