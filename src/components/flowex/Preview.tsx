@@ -1,4 +1,3 @@
-import { Pause, Play } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import type { Project } from "@/lib/flowex/types";
 import { buildStageDoc } from "@/lib/flowex/stage";
@@ -6,20 +5,24 @@ import { buildStageDoc } from "@/lib/flowex/stage";
 export function Preview({
   project,
   playing,
-  onTogglePlay,
   time,
   seekToken,
   onTime,
+  assetUrls,
 }: {
   project: Project;
   playing: boolean;
-  onTogglePlay: () => void;
   time: number;
   seekToken: number;
   onTime: (t: number) => void;
+  assetUrls: Record<string, string>;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
-  const doc = useMemo(() => buildStageDoc(project), [project]);
+  const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const timeRef = useRef(time);
+  timeRef.current = time;
+
+  const doc = useMemo(() => buildStageDoc(project, assetUrls), [project, assetUrls]);
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
@@ -42,10 +45,39 @@ export function Preview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seekToken, doc]);
 
+  // Keep real audio clips in sync with the playhead.
+  useEffect(() => {
+    const els = audioRefs.current;
+    const tick = () => {
+      const t = timeRef.current;
+      for (const clip of project.audio) {
+        const el = els.get(clip.id);
+        if (!el) continue;
+        el.volume = clip.muted ? 0 : clip.volume;
+        const local = t - clip.start;
+        const dur = Number.isFinite(el.duration) ? el.duration : Infinity;
+        const inside = local >= 0 && local < dur;
+        if (playing && inside && !clip.muted) {
+          if (Math.abs(el.currentTime - local) > 0.25) el.currentTime = local;
+          if (el.paused) el.play().catch(() => {});
+        } else if (!el.paused) {
+          el.pause();
+        }
+      }
+    };
+    tick();
+    if (!playing) return;
+    const id = window.setInterval(tick, 150);
+    return () => window.clearInterval(id);
+  }, [playing, project.audio, seekToken]);
+
   return (
     <div className="panel p-2 sm:p-3">
-      <div className="group relative overflow-hidden rounded-2xl bg-black">
-        <div className="aspect-video w-full">
+      <div className="relative overflow-hidden rounded-2xl bg-black">
+        <div
+          className="mx-auto w-full"
+          style={{ aspectRatio: `${project.width} / ${project.height}`, maxHeight: "62vh" }}
+        >
           <iframe
             ref={ref}
             title={`Сцена ${project.name}`}
@@ -54,20 +86,21 @@ export function Preview({
             sandbox="allow-scripts allow-same-origin"
           />
         </div>
-        <button
-          onClick={onTogglePlay}
-          aria-label={playing ? "Пауза" : "Воспроизвести"}
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/45 backdrop-blur-sm transition group-hover:bg-black/60">
-            {playing ? (
-              <Pause className="h-7 w-7 text-white" />
-            ) : (
-              <Play className="ml-1 h-7 w-7 text-white" />
-            )}
-          </span>
-        </button>
       </div>
+      {project.audio.map((c) =>
+        assetUrls[c.assetId] ? (
+          <audio
+            key={c.id}
+            ref={(el) => {
+              if (el) audioRefs.current.set(c.id, el);
+              else audioRefs.current.delete(c.id);
+            }}
+            src={assetUrls[c.assetId]}
+            preload="auto"
+            className="hidden"
+          />
+        ) : null,
+      )}
     </div>
   );
 }
