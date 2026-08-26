@@ -285,12 +285,12 @@ export async function generateSuggestions(opts: {
   prompt?: string;
 }): Promise<string[]> {
   const text = await chat({
-    settings,
+    settings: opts.settings,
     system:
       "Ты помощник видеоредактора. Верни ТОЛЬКО JSON-массив из 4 строк — коротких (2–4 слова) идей следующего улучшения ролика на русском. Без пояснений.",
     user: `Код текущего ролика:\n${opts.js.slice(0, 4000)}\n\nПоследний запрос: ${opts.prompt ?? "—"}`,
     maxTokens: 300,
-  } as ChatOpts & { settings: Settings });
+  });
   try {
     const start = text.indexOf("[");
     const end = text.lastIndexOf("]");
@@ -299,8 +299,5 @@ export async function generateSuggestions(opts: {
   } catch {
     return [];
   }
-
-  function settings() {
-    return opts.settings;
-  }
 }
+
