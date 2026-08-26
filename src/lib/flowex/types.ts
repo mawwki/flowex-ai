@@ -7,7 +7,7 @@ export type Scene = {
   html: string;
 };
 
-export type AssetKind = "image" | "video" | "audio";
+export type AssetKind = "image" | "video" | "audio" | "model" | "texture" | "animation";
 
 export type Asset = {
   id: string;

@@ -11,6 +11,7 @@ import { SettingsDialog } from "@/components/flowex/SettingsDialog";
 import { CodePanel } from "@/components/flowex/CodePanel";
 import { StylePicker } from "@/components/flowex/StylePicker";
 import { Inspector } from "@/components/flowex/Inspector";
+import { Library } from "@/components/flowex/Library";
 import { useFlowexStore, uid, ASPECTS } from "@/lib/flowex/store";
 import { generateScene, generateSuggestions } from "@/lib/flowex/providers";
 import { download, exportVideo } from "@/lib/flowex/export";
@@ -489,17 +490,29 @@ export function App() {
         </header>
 
         {/* Editor area */}
-        <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-3 px-4 pb-10 sm:px-8">
-          <Preview
-            project={active}
-            playing={playing}
-            time={time}
-            seekToken={seekToken}
-            onTime={setTime}
-            assetUrls={assetUrls}
-            onError={onSceneError}
-            onTogglePlay={() => setPlaying((p) => !p)}
-          />
+        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-3 px-4 pb-10 sm:px-8">
+          <div className="flex gap-3">
+            <div className="min-w-0 flex-1">
+              <Preview
+                project={active}
+                playing={playing}
+                time={time}
+                seekToken={seekToken}
+                onTime={setTime}
+                assetUrls={assetUrls}
+                onError={onSceneError}
+                onTogglePlay={() => setPlaying((p) => !p)}
+              />
+            </div>
+            <div className="hidden h-[300px] w-[200px] flex-shrink-0 overflow-hidden rounded-2xl border border-border/30 bg-surface/60 backdrop-blur-sm sm:block">
+              <Library
+                assets={active.assets}
+                assetUrls={assetUrls}
+                onRemove={removeAsset}
+                onAttach={handleAttach}
+              />
+            </div>
+          </div>
 
           <PlaybackBar
             playing={playing}

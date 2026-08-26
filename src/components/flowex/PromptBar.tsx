@@ -1,8 +1,12 @@
 import {
   ArrowUp,
+  Box,
   ChevronDown,
+  Film,
   FileImage,
   FileVideo,
+  Layers,
+  Lightbulb,
   Loader2,
   Mic,
   Music,
@@ -38,6 +42,7 @@ export function PromptBar({
   const [value, setValue] = useState("");
   const [open, setOpen] = useState(false);
   const [listening, setListening] = useState(false);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -46,6 +51,10 @@ export function PromptBar({
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 176)}px`;
+  }, [value]);
+
+  useEffect(() => {
+    if (value) setSuggestionsOpen(false);
   }, [value]);
 
   const send = (text: string) => {
@@ -83,6 +92,12 @@ export function PromptBar({
       <FileImage className="h-3.5 w-3.5" />
     ) : a.kind === "video" ? (
       <FileVideo className="h-3.5 w-3.5" />
+    ) : a.kind === "model" ? (
+      <Box className="h-3.5 w-3.5" />
+    ) : a.kind === "texture" ? (
+      <Layers className="h-3.5 w-3.5" />
+    ) : a.kind === "animation" ? (
+      <Film className="h-3.5 w-3.5" />
     ) : (
       <Music className="h-3.5 w-3.5" />
     );
@@ -92,17 +107,31 @@ export function PromptBar({
       {above}
 
       {suggestions.length ? (
-        <div className="mb-3 flex flex-wrap justify-center gap-2">
-          {suggestions.map((s) => (
-            <button
-              key={s}
-              onClick={() => send(s)}
-              disabled={busy}
-              className="rounded-full border border-border/60 bg-surface-2/50 px-3.5 py-1.5 text-xs text-muted-foreground backdrop-blur-sm transition-all hover:border-border hover:bg-surface-2 hover:text-foreground hover:shadow-sm disabled:opacity-50"
-            >
-              {s}
-            </button>
-          ))}
+        <div className="mb-2">
+          <button
+            onClick={() => setSuggestionsOpen((o) => !o)}
+            className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+          >
+            <Lightbulb className="h-3 w-3" />
+            <span>{suggestionsOpen ? "Скрыть идеи" : "Показать идеи"}</span>
+            <ChevronDown
+              className={cn("h-3 w-3 transition-transform", suggestionsOpen && "rotate-180")}
+            />
+          </button>
+          {suggestionsOpen ? (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => send(s)}
+                  disabled={busy}
+                  className="rounded-full border border-border/40 bg-surface-2/30 px-3 py-1 text-[11px] text-muted-foreground/70 transition-all hover:border-border/60 hover:bg-surface-2/60 hover:text-foreground disabled:opacity-50"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -137,7 +166,7 @@ export function PromptBar({
         <input
           ref={fileRef}
           type="file"
-          accept="image/*,video/*,audio/*"
+          accept="image/*,video/*,audio/*,.glb,.gltf,.dds,.ktx,.ktx2,.hdr,.exr,.anim,.bvh,.fbx,.dae,.tga,.bmp,.tiff"
           multiple
           className="hidden"
           onChange={(e) => {

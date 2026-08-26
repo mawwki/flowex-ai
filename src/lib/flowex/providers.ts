@@ -410,15 +410,34 @@ export async function generateScene(opts: {
   const { settings, prompt, currentJs, duration, aspect, assets = [], audio = [] } = opts;
 
   const media = assets.filter((a) => a.kind !== "audio");
-  const describe = (a: Asset) =>
-    `'${a.name}' — ${a.kind}` +
-    (a.width ? ` ${a.width}×${a.height}px` : "") +
-    (a.duration ? ` ${(Math.round(a.duration * 10) / 10).toFixed(1)}с` : "");
+  const describe = (a: Asset) => {
+    const kindLabel: Record<string, string> = {
+      image: "изображение",
+      video: "видео",
+      model: "3D-модель (GLB/GLTF)",
+      texture: "текстура",
+      animation: "файл анимации",
+    };
+    const parts = [`'${a.name}' — ${kindLabel[a.kind] ?? a.kind}`];
+    if (a.width && a.height) parts.push(`${a.width}×${a.height}px`);
+    if (a.duration) parts.push(`${(Math.round(a.duration * 10) / 10).toFixed(1)}с`);
+    if (a.kind === "model") parts.push(`формат ${a.fileName.split(".").pop()?.toUpperCase()}`);
+    if (a.kind === "texture") parts.push(`формат ${a.fileName.split(".").pop()?.toUpperCase()}`);
+    return parts.join(" ");
+  };
   const assetLine = media.length
     ? `Прикреплённые файлы (ASSETS['имя']): ${media.map(describe).join("; ")}`
     : "Ассетов пользователь не прикрепил — рисуй всё кодом.";
   const assetTask = media.length
-    ? "Встрой эти файлы в ролик по смыслу запроса: фото — фоном через FX.kenBurns или карточкой FX.img, видео — как живой фон/вставку с обложкой-рамкой. Если файл не подходит для запроса — скажи об этом в notes."
+    ? [
+        "Встрой эти файлы в ролик по смыслу запроса:",
+        "• изображения — фоном через FX.kenBurns, карточкой FX.img, или маской",
+        "• видео — как живой фон/вставку с обложкой-рамкой",
+        "• 3D-модели — отрисуй через проекцию (рисуй полигоны/ребра кодом на Canvas) или используй как справочную",
+        "• текстуры — примени как фон/паттерн через createPattern или наложи на элементы",
+        "• анимации — используй ключевые кадры из файла, опиши движение в коде",
+        "Если файл не подходит для запроса — скажи об этом в notes.",
+      ].join("\n")
     : "";
   const audioLine = audio.length
     ? `Аудиодорожки на таймлайне: ${audio

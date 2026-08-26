@@ -6,8 +6,14 @@ export function assetKind(file: File): Asset["kind"] | null {
   if (file.type.startsWith("image/")) return "image";
   if (file.type.startsWith("video/")) return "video";
   if (file.type.startsWith("audio/")) return "audio";
+  if (file.type === "model/gltf-binary" || file.type === "model/gltf+json") return "model";
+  if (file.type === "application/octet-stream" && /\.(glb|gltf)$/i.test(file.name)) return "model";
+  if (/\.(dds|ktx|ktx2|hdr|exr)$/i.test(file.name)) return "texture";
+  if (/\.(glb|gltf)$/i.test(file.name)) return "model";
+  if (/\.(anim|bvh|fbx|dae)$/i.test(file.name)) return "animation";
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg"].includes(ext)) return "image";
+  if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp", "tga", "tiff"].includes(ext))
+    return "texture";
   if (["mp4", "webm", "mov", "mkv"].includes(ext)) return "video";
   if (["mp3", "wav", "ogg", "m4a", "aac", "flac", "opus"].includes(ext)) return "audio";
   return null;
@@ -95,12 +101,14 @@ export async function processFiles(
     }
     const id = uid();
     await putBlob(id, file).catch(() => undefined);
-    const url = URL.createObjectURL(file);
-    const meta = await mediaMeta(url, kind);
-    URL.revokeObjectURL(url);
-
     const name = uniqueName(baseName(file), names);
     names.add(name);
+
+    const readMedia = kind === "image" || kind === "video" || kind === "audio";
+    const url = readMedia ? URL.createObjectURL(file) : "";
+    const meta = readMedia ? await mediaMeta(url, kind) : { duration: 0, width: 0, height: 0 };
+    if (url) URL.revokeObjectURL(url);
+
     const asset: Asset = {
       id,
       kind,
