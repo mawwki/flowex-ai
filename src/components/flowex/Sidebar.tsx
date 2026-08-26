@@ -1,4 +1,4 @@
-import { Folder, Plus, Trash2, Copy, Pencil, X } from "lucide-react";
+import { Folder, Plus, Search, Trash2, Copy, Pencil, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Project } from "@/lib/flowex/types";
 import { renderThumb } from "@/lib/flowex/stage";
@@ -44,6 +44,12 @@ export function Sidebar({
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? projects.filter((p) => p.name.toLowerCase().includes(q)) : projects;
+  }, [projects, query]);
 
   return (
     <aside className="flex h-full w-full flex-col bg-sidebar lg:w-[300px] lg:shrink-0">
@@ -78,8 +84,25 @@ export function Sidebar({
         Video album
       </p>
 
+      <div className="px-5 pb-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Поиск проектов"
+            className="w-full rounded-full border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-[var(--accent)]/60"
+          />
+        </div>
+      </div>
+
       <div className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-        {projects.map((p) => {
+        {filtered.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+            {projects.length ? "Ничего не найдено" : "Пока нет проектов"}
+          </p>
+        ) : null}
+        {filtered.map((p) => {
           const active = p.id === activeId;
           return (
             <div
@@ -89,6 +112,9 @@ export function Sidebar({
                 active ? "bg-surface-2 ring-1 ring-border" : "hover:bg-sidebar-accent",
               )}
             >
+              {active ? (
+                <span className="absolute top-3 bottom-3 -left-0.5 w-1 rounded-full bg-[var(--accent)]" />
+              ) : null}
               <button
                 onClick={() => onSelect(p.id)}
                 className="flex min-w-0 flex-1 items-center gap-3 text-left"
@@ -118,6 +144,7 @@ export function Sidebar({
               <span className="pointer-events-none absolute right-2 flex shrink-0 gap-0.5 rounded-xl bg-surface-2/95 p-0.5 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
                 <button
                   aria-label="Переименовать"
+                  title="Переименовать"
                   onClick={() => {
                     setEditing(p.id);
                     setDraft(p.name);
@@ -128,6 +155,7 @@ export function Sidebar({
                 </button>
                 <button
                   aria-label="Дублировать"
+                  title="Дублировать"
                   onClick={() => onDuplicate(p.id)}
                   className="rounded-md p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
                 >
@@ -135,6 +163,7 @@ export function Sidebar({
                 </button>
                 <button
                   aria-label="Удалить"
+                  title="Удалить"
                   onClick={() => onDelete(p.id)}
                   className="rounded-md p-1.5 text-muted-foreground hover:bg-surface hover:text-destructive"
                 >

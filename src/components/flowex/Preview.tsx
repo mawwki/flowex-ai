@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Project } from "@/lib/flowex/types";
 import { buildStageDoc } from "@/lib/flowex/stage";
 
@@ -10,6 +10,7 @@ export function Preview({
   onTime,
   assetUrls,
   onError,
+  onTogglePlay,
 }: {
   project: Project;
   playing: boolean;
@@ -18,36 +19,53 @@ export function Preview({
   onTime: (t: number) => void;
   assetUrls: Record<string, string>;
   onError?: (message: string) => void;
+  onTogglePlay?: () => void;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const timeRef = useRef(time);
   timeRef.current = time;
 
-  const doc = useMemo(() => buildStageDoc(project, assetUrls), [project, assetUrls]);
+  const post = useCallback((msg: Record<string, unknown>) => {
+    ref.current?.contentWindow?.postMessage({ source: "flowex-host", ...msg }, "*");
+  }, []);
+
+  const doc = useMemo(
+    () => buildStageDoc(project, assetUrls),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      project.scene,
+      project.width,
+      project.height,
+      project.duration,
+      project.fps,
+      project.config,
+      assetUrls,
+    ],
+  );
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       const d = e.data as { source?: string; type?: string; t?: number; error?: string };
       if (d?.source !== "flowex") return;
       if (d.type === "time" && typeof d.t === "number") onTime(d.t);
-      if (d.type === "ready" && d.error) onError?.(d.error);
+      if (d.type === "ready") {
+        post({ type: "seek", t: timeRef.current });
+        if (d.error) onError?.(d.error);
+      }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [onTime, onError]);
-
-  const post = (msg: Record<string, unknown>) =>
-    ref.current?.contentWindow?.postMessage({ source: "flowex-host", ...msg }, "*");
+  }, [onTime, onError, post]);
 
   useEffect(() => {
     post({ type: playing ? "play" : "pause" });
-  }, [playing, doc]);
+  }, [playing, doc, post]);
 
   useEffect(() => {
     post({ type: "seek", t: time });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seekToken, doc]);
+  }, [seekToken, doc, post]);
 
   // Keep real audio clips in sync with the playhead.
   useEffect(() => {
@@ -96,6 +114,18 @@ export function Preview({
             className="h-full w-full border-0"
             sandbox="allow-scripts allow-same-origin"
           />
+          {onTogglePlay ? (
+            <button
+              onClick={onTogglePlay}
+              aria-label={playing ? "Пауза" : "Воспроизвести"}
+              title="Клик — пауза / воспроизведение"
+              className="absolute inset-0 z-10 cursor-pointer opacity-0 transition-opacity hover:opacity-100"
+            >
+              <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] text-white/85 backdrop-blur-sm">
+                {playing ? "II пауза" : "▶ играть"}
+              </span>
+            </button>
+          ) : null}
         </div>
       </div>
       {project.audio.map((c) =>

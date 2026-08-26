@@ -9,7 +9,7 @@ import {
   Paperclip,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PROVIDERS, getProvider, modelsFor } from "@/lib/flowex/providers";
 import type { Asset, Settings } from "@/lib/flowex/types";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,15 @@ export function PromptBar({
   const [open, setOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 176)}px`;
+  }, [value]);
+
   const send = (text: string) => {
     const t = text.trim();
     if (!t || busy) return;
@@ -121,7 +130,7 @@ export function PromptBar({
 
       <div
         className={cn(
-          "mt-4 flex items-center gap-2 rounded-3xl border border-border bg-surface px-3 py-2",
+          "mt-4 flex items-end gap-2 rounded-3xl border border-border bg-surface px-3 py-2 transition-colors focus-within:border-[var(--accent)]/60",
           assets.length && "rounded-t-sm",
         )}
       >
@@ -139,28 +148,36 @@ export function PromptBar({
         <button
           onClick={() => fileRef.current?.click()}
           aria-label="Прикрепить фото, видео или звук"
-          title="Прикрепить фото / видео / звук"
-          className="rounded-full p-2 text-muted-foreground hover:text-foreground"
+          title="Прикрепить фото / видео / звук (или перетащите файлы в окно)"
+          className="mb-1.5 rounded-full p-2 text-muted-foreground hover:text-foreground"
         >
           <Paperclip className="h-5 w-5" />
         </button>
-        <input
+        <textarea
+          ref={taRef}
+          rows={1}
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send(value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send(value);
+            }
+          }}
           placeholder={
             assets.length
               ? "Куда вставить эти файлы и что с ними сделать?"
               : "Опишите видео или что изменить…"
           }
-          className="min-w-0 flex-1 bg-transparent py-2 text-[15px] outline-none placeholder:text-muted-foreground"
+          className="max-h-44 min-h-[42px] min-w-0 flex-1 resize-none self-center bg-transparent py-2.5 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground"
         />
         <button
           onClick={dictate}
           aria-label="Голосовой ввод"
+          title="Голосовой ввод"
           className={cn(
-            "rounded-full p-2 hover:text-foreground",
-            listening ? "text-playhead" : "text-muted-foreground",
+            "mb-1.5 rounded-full p-2 hover:text-foreground",
+            listening ? "text-playhead pulse-soft" : "text-muted-foreground",
           )}
         >
           <Mic className="h-5 w-5" />
@@ -169,13 +186,33 @@ export function PromptBar({
           onClick={() => send(value)}
           disabled={busy}
           aria-label="Отправить"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+          title="Отправить (Enter)"
+          className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
         >
           {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUp className="h-5 w-5" />}
         </button>
       </div>
 
-      <div className="relative mt-4 flex justify-center">
+      <p className="mt-2 hidden justify-center gap-4 text-[11px] text-muted-foreground sm:flex">
+        <span>
+          <kbd className="rounded border border-border bg-surface-2 px-1 py-0.5 font-sans">
+            Enter
+          </kbd>{" "}
+          отправить
+        </span>
+        <span>
+          <kbd className="rounded border border-border bg-surface-2 px-1 py-0.5 font-sans">
+            Shift+Enter
+          </kbd>{" "}
+          новая строка
+        </span>
+        <span>
+          <kbd className="rounded border border-border bg-surface-2 px-1 py-0.5 font-sans">Space</kbd>{" "}
+          пауза / плей
+        </span>
+      </p>
+
+      <div className="relative mt-3 flex justify-center">
         <button
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"

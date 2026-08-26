@@ -78,6 +78,13 @@ function FlowexApp() {
   const [navOpen, setNavOpen] = useState(false);
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const sceneErrorRef = useRef("");
+  const timeRef = useRef(0);
+  timeRef.current = time;
+  const durationRef = useRef(1);
+  durationRef.current = active?.duration ?? 1;
+  const assetsRef = useRef(active?.assets ?? []);
+  assetsRef.current = active?.assets ?? [];
+  const assetIdsKey = (active?.assets ?? []).map((a) => a.id).join(",");
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -104,9 +111,8 @@ function FlowexApp() {
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      if (!active) return;
       const entries = await Promise.all(
-        active.assets.map(async (a) => [a.id, await assetUrl(a.id)] as const),
+        assetsRef.current.map(async (a) => [a.id, await assetUrl(a.id)] as const),
       );
       if (cancelled) return;
       setAssetUrls(Object.fromEntries(entries.filter((e): e is [string, string] => !!e[1])));
@@ -115,7 +121,7 @@ function FlowexApp() {
     return () => {
       cancelled = true;
     };
-  }, [active?.assets, active]);
+  }, [assetIdsKey, activeId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -125,6 +131,15 @@ function FlowexApp() {
       if (e.code === "Space") {
         e.preventDefault();
         setPlaying((p) => !p);
+        return;
+      }
+      if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
+        e.preventDefault();
+        const step = e.shiftKey ? 5 : 1;
+        const next = timeRef.current + (e.code === "ArrowRight" ? step : -step);
+        setPlaying(false);
+        setTime(Math.max(0, Math.min(durationRef.current, next)));
+        setSeekToken((x) => x + 1);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -290,12 +305,12 @@ function FlowexApp() {
     if (!active || !newJs) return;
     const parsed = parseScenes(newJs);
     const total = parsed ? sceneTotal(parsed) : active.duration;
+    const clamped = clampDur(total);
     updateProject(active.id, {
-      scene: { ...active.scene, js: syncTotalConstants(newJs, total) },
-      duration: clampDur(total),
+      scene: { ...active.scene, js: syncTotalConstants(newJs, clamped) },
+      duration: clamped,
     });
-    seek(0);
-    toast.success("Сцены обновлены", { description: `Новая длительность: ${clampDur(total)} с` });
+    seek(Math.min(time, clamped));
   };
 
   const setSceneDurations = (durs: number[]) => {
@@ -492,6 +507,7 @@ function FlowexApp() {
             onTime={setTime}
             assetUrls={assetUrls}
             onError={onSceneError}
+            onTogglePlay={() => setPlaying((p) => !p)}
           />
 
           <PlaybackBar

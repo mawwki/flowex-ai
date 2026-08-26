@@ -158,14 +158,13 @@ export function Timeline({
         const next = Math.max(0, Math.min(d.orig.start + dt, dur - len));
         onUpdateClip(d.id, { start: Math.round(next * 20) / 20 });
       } else if (d.mode === "trim-left") {
-        const maxShrink = len - MIN_LEN;
-        const shrink = Math.max(-d.orig.start, Math.min(dt, maxShrink));
-        const newLen = len - shrink;
-        const srcAvail = sourceLen(d.orig) - (d.orig.offset ?? 0) - shrink * speed;
+        const maxShrinkLen = len - MIN_LEN;
+        const maxShrinkSrc = (sourceLen(d.orig) - (d.orig.offset ?? 0)) / speed - MIN_LEN;
+        const shrink = Math.max(-d.orig.start, Math.min(dt, maxShrinkLen, maxShrinkSrc));
         onUpdateClip(d.id, {
           start: Math.round((d.orig.start + shrink) * 20) / 20,
           offset: Math.round(((d.orig.offset ?? 0) + shrink * speed) * 100) / 100,
-          length: Math.round(Math.max(MIN_LEN, Math.min(newLen, srcAvail / speed)) * 100) / 100,
+          length: Math.round((len - shrink) * 100) / 100,
         });
       } else {
         const grow = Math.min(dt, dur - d.orig.start - len);
@@ -250,7 +249,7 @@ export function Timeline({
   }, [scenes, effDurs]);
 
   return (
-    <div className="panel px-4 py-4 sm:px-6">
+    <div className="panel touch-none px-4 py-4 select-none sm:px-6">
       <div className="relative ml-14 h-5 text-[11px] text-muted-foreground">
         {ticks.map((t) => (
           <span
@@ -278,11 +277,17 @@ export function Timeline({
           <div
             data-video-track
             onPointerDown={(e) => {
-              setSelectedScene(null);
-              setSelectedId(null);
+              const block = (e.target as HTMLElement).closest("[data-scene-index]");
+              if (block) {
+                setSelectedScene(Number(block.getAttribute("data-scene-index")));
+                setSelectedId(null);
+              } else {
+                setSelectedScene(null);
+                setSelectedId(null);
+              }
               startSeekDrag(e);
             }}
-            className="relative h-14 flex-1 cursor-pointer overflow-hidden rounded-xl bg-track"
+            className="relative h-14 flex-1 cursor-pointer touch-none overflow-hidden rounded-xl bg-track select-none"
           >
             {videoVisible ? (
               <div className="flex h-full w-full">
@@ -301,18 +306,14 @@ export function Timeline({
             {sceneBounds.length && videoVisible
               ? sceneBounds.map((b, i) => (
                   <div key={i}>
-                    <button
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        setSelectedScene(i);
-                        setSelectedId(null);
-                      }}
-                      title={scenes?.[i]?.id || `Сцена ${i + 1}`}
+                    <div
+                      data-scene-index={i}
+                      title={`${scenes?.[i]?.id || `Сцена ${i + 1}`} — клик выбирает сцену`}
                       className={cn(
-                        "absolute top-1 bottom-1 overflow-hidden rounded-lg px-2 text-left text-[10px] font-medium text-white/95 ring-1 backdrop-blur-[1px] transition-colors",
+                        "absolute top-1 bottom-1 overflow-hidden rounded-lg px-2 text-left text-[10px] font-medium text-white/95 ring-1 backdrop-blur-[1px]",
                         selectedScene === i
                           ? "bg-black/45 ring-2 ring-[var(--accent)]"
-                          : "bg-black/30 ring-white/25 hover:bg-black/40",
+                          : "bg-black/30 ring-white/25",
                       )}
                       style={{
                         left: `${(b.left / dur) * 100}%`,
@@ -322,7 +323,7 @@ export function Timeline({
                       <span className="block truncate leading-[3rem]">
                         {scenes?.[i]?.id || `Сцена ${i + 1}`} · {Math.round(b.width * 10) / 10}с
                       </span>
-                    </button>
+                    </div>
                     {i < sceneBounds.length - 1 ? (
                       <span
                         onPointerDown={(e) => startBoundaryDrag(e, i)}
@@ -410,7 +411,7 @@ export function Timeline({
               setSelectedScene(null);
               startSeekDrag(e);
             }}
-            className="relative flex h-11 flex-1 items-center overflow-hidden rounded-xl bg-track"
+            className="relative flex h-11 flex-1 cursor-pointer touch-none items-center overflow-hidden rounded-xl bg-track select-none"
           >
             {project.audio.length === 0 ? (
               <button
