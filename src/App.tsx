@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Toaster } from "@/components/ui/sonner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Code2, Download, Loader2, Menu, Moon, Settings, Sun } from "lucide-react";
@@ -30,28 +30,9 @@ import { blankScene } from "@/lib/flowex/scenes";
 import type { ConfigMap } from "@/lib/flowex/config";
 import type { AudioClip } from "@/lib/flowex/types";
 
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Flowex — AI видеоредактор на коде" },
-      {
-        name: "description",
-        content:
-          "Flowex создаёт видео кодом: опишите сцену, ИИ напишет HTML/CSS/JS анимацию, отредактируйте и скачайте ролик.",
-      },
-      { property: "og:title", content: "Flowex — AI видеоредактор на коде" },
-      {
-        property: "og:description",
-        content: "Генерация и редактирование видео с помощью ИИ и Canvas-кода прямо в браузере.",
-      },
-    ],
-  }),
-  component: FlowexApp,
-});
-
 const clampDur = (d: number) => Math.max(1, Math.min(300, d));
 
-function FlowexApp() {
+export function App() {
   const store = useFlowexStore();
   const {
     hydrated,
@@ -87,7 +68,6 @@ function FlowexApp() {
   const assetIdsKey = (active?.assets ?? []).map((a) => a.id).join(",");
 
   useEffect(() => {
-    if (typeof document === "undefined") return;
     document.documentElement.classList.toggle("light", settings.theme === "light");
     const map: Record<string, string> = {
       violet: "oklch(0.72 0.15 300)",
@@ -422,6 +402,8 @@ function FlowexApp() {
 
   return (
     <div className="flex min-h-screen bg-background">
+      <Toaster position="top-center" theme="dark" richColors />
+
       {/* Sidebar */}
       <div className="hidden h-screen lg:block">
         <Sidebar {...sidebarProps} />
