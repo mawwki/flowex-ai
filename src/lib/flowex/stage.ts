@@ -93,7 +93,7 @@ ${overrideSnippet(project.config)}
   });
   parent.postMessage({source:'flowex',type:'ready',error:__err},'*');
 })();
-<\/script></body></html>`;
+${"</" + "script>"}</body></html>`;
 }
 
 /** Renders a still frame of the scene to an offscreen canvas (thumbnails). */
@@ -106,7 +106,6 @@ export function renderThumb(project: Project, t: number, w = 160): string {
   const ctx = canvas.getContext("2d");
   if (!ctx) return "";
   try {
-    // eslint-disable-next-line no-new-func
     const fn = new Function(
       `${FX_RUNTIME}
        var ASSETS={}; function getAsset(){return null;}

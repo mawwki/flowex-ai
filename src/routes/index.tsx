@@ -1,16 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Code2, Download, Loader2, Menu, Moon, Settings, Sun } from "lucide-react";
 import { Sidebar } from "@/components/flowex/Sidebar";
 import { Preview } from "@/components/flowex/Preview";
+import { PlaybackBar } from "@/components/flowex/PlaybackBar";
 import { Timeline } from "@/components/flowex/Timeline";
 import { PromptBar } from "@/components/flowex/PromptBar";
 import { SettingsDialog } from "@/components/flowex/SettingsDialog";
 import { CodePanel } from "@/components/flowex/CodePanel";
-import { useFlowexStore } from "@/lib/flowex/store";
-import { generateScene } from "@/lib/flowex/providers";
+import { StylePicker } from "@/components/flowex/StylePicker";
+import { Inspector } from "@/components/flowex/Inspector";
+import { useFlowexStore, uid, ASPECTS } from "@/lib/flowex/store";
+import { generateScene, generateSuggestions } from "@/lib/flowex/providers";
 import { download, exportVideo } from "@/lib/flowex/export";
+import { assetUrl, delBlob, forgetUrl } from "@/lib/flowex/idb";
+import { blobToClip, nextClipStart, processFiles } from "@/lib/flowex/media";
+import { STYLE_PRESETS, STARTER_HINTS } from "@/lib/flowex/styles";
+import { blankScene } from "@/lib/flowex/scenes";
+import type { ConfigMap } from "@/lib/flowex/config";
+import type { AudioClip } from "@/lib/flowex/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -30,6 +39,8 @@ export const Route = createFileRoute("/")({
   }),
   component: FlowexApp,
 });
+
+const clampDur = (d: number) => Math.max(1, Math.min(300, d));
 
 function FlowexApp() {
   const store = useFlowexStore();
@@ -54,7 +65,10 @@ function FlowexApp() {
   const [exporting, setExporting] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  const sceneErrorRef = useRef("");
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -74,8 +88,39 @@ function FlowexApp() {
     setTime(0);
     setSeekToken((t) => t + 1);
     setPlaying(settings.autoPlay);
+    sceneErrorRef.current = "";
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (!active) return;
+      const entries = await Promise.all(
+        active.assets.map(async (a) => [a.id, await assetUrl(a.id)] as const),
+      );
+      if (cancelled) return;
+      setAssetUrls(Object.fromEntries(entries.filter((e): e is [string, string] => !!e[1])));
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [active?.assets, active]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (el?.isContentEditable) return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        setPlaying((p) => !p);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const seek = useCallback((t: number) => {
     setPlaying(false);
@@ -83,40 +128,177 @@ function FlowexApp() {
     setSeekToken((x) => x + 1);
   }, []);
 
+  const refreshSuggestions = useCallback(
+    (projectId: string, js: string, prompt: string) => {
+      generateSuggestions({ settings, js, prompt })
+        .then((list) => {
+          if (list.length) updateProject(projectId, { suggestions: list });
+        })
+        .catch(() => {});
+    },
+    [settings, updateProject],
+  );
+
   const handlePrompt = async (prompt: string) => {
     if (!active) return;
     setBusy(true);
     const id = toast.loading("ИИ пишет код сцены…");
     try {
+      const preset = STYLE_PRESETS.find((s) => s.id === active.styleId);
+      const fullPrompt = preset
+        ? `${prompt}\n\n[Выбранный стиль: ${preset.title}] ${preset.prompt}`
+        : prompt;
       const res = await generateScene({
         settings,
-        prompt,
+        prompt: fullPrompt,
         currentJs: active.scene.js,
         duration: active.duration,
+        aspect: active.aspect,
+        assets: active.assets,
+        audio: active.audio,
       });
-      updateProject(active.id, {
+      const patch: Parameters<typeof updateProject>[1] = {
         scene: { js: res.js, css: res.css, html: res.html },
-        duration: res.duration && res.duration > 1 ? Math.min(60, res.duration) : active.duration,
-        name: active.name === "Untitled" && res.name ? res.name : active.name,
+        config: {},
+        suggestions: res.suggestions?.length ? res.suggestions.slice(0, 4) : active.suggestions,
+      };
+      if (res.duration && res.duration >= 1) patch.duration = clampDur(res.duration);
+      if (res.aspect && ASPECTS[res.aspect] && res.aspect !== active.aspect) {
+        patch.aspect = res.aspect;
+        patch.width = ASPECTS[res.aspect]!.w;
+        patch.height = ASPECTS[res.aspect]!.h;
+      }
+      if (active.name === "Untitled" && res.name) patch.name = res.name;
+      const dur = patch.duration ?? active.duration;
+      setTime(0);
+      setSeekToken((x) => x + 1);
+      updateProject(active.id, {
+        ...patch,
         messages: [
           ...active.messages,
-          { id: crypto.randomUUID(), role: "user", content: prompt, at: Date.now() },
+          { id: uid(), role: "user", content: prompt, at: Date.now() },
           {
-            id: crypto.randomUUID(),
+            id: uid(),
             role: "assistant",
-            content: "Сцена обновлена",
+            content: res.notes || "Сцена обновлена",
             at: Date.now(),
           },
         ],
       });
-      setTime(0);
-      setSeekToken((x) => x + 1);
-      toast.success("Сцена обновлена", { id });
+      toast.success("Сцена обновлена", {
+        id,
+        description: `${dur.toFixed(0)} с · ${res.notes ? res.notes.slice(0, 90) : ""}`.trim(),
+      });
+      if (!res.suggestions?.length && res.js) {
+        refreshSuggestions(active.id, res.js, prompt);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Не удалось сгенерировать сцену", { id });
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleAttach = async (files: FileList | null) => {
+    if (!active || !files?.length) return;
+    const id = toast.loading(`Прикрепляю файлы (${files.length})…`);
+    try {
+      const result = await processFiles(Array.from(files), {
+        takenNames: active.assets.map((a) => a.name),
+        startAt: nextClipStart(active.audio, active.assets, active.duration),
+        projectDuration: active.duration,
+      });
+      updateProject(active.id, {
+        assets: [...active.assets, ...result.assets],
+        audio: [...active.audio, ...result.clips],
+      });
+      if (result.assets.length) {
+        toast.success(
+          `Прикреплено: ${result.assets.map((a) => a.name).join(", ")}. Скажите ИИ, куда их вставить.`,
+          { id },
+        );
+      } else {
+        toast.error("Не удалось прикрепить файлы", { id });
+      }
+      if (result.failed.length) {
+        toast.warning(`Пропущены неподдерживаемые файлы: ${result.failed.join(", ")}`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ошибка загрузки файлов", { id });
+    }
+  };
+
+  const removeAsset = (assetId: string) => {
+    if (!active) return;
+    delBlob(assetId).catch(() => {});
+    forgetUrl(assetId);
+    setAssetUrls(({ [assetId]: _drop, ...rest }) => rest);
+    updateProject(active.id, {
+      assets: active.assets.filter((a) => a.id !== assetId),
+      audio: active.audio.filter((c) => c.assetId !== assetId),
+    });
+  };
+
+  const addVoice = async (blob: Blob, startAt: number) => {
+    if (!active) return;
+    try {
+      const names = active.assets.map((a) => a.name);
+      let name = "voice";
+      let i = 2;
+      while (names.includes(name)) name = `voice-${i++}`;
+      const { asset, clip } = await blobToClip(blob, name, startAt, active.duration);
+      updateProject(active.id, {
+        assets: [...active.assets, asset],
+        audio: [...active.audio, clip],
+      });
+      toast.success(`Озвучка добавлена с ${clip.start.toFixed(1)}с`);
+    } catch {
+      toast.error("Не удалось сохранить запись");
+    }
+  };
+
+  const updateClip = (clipId: string, patch: Partial<AudioClip>) => {
+    if (!active) return;
+    updateProject(active.id, {
+      audio: active.audio.map((c) => (c.id === clipId ? { ...c, ...patch } : c)),
+    });
+  };
+
+  const removeClip = (clipId: string) => {
+    if (!active) return;
+    updateProject(active.id, { audio: active.audio.filter((c) => c.id !== clipId) });
+  };
+
+  const toggleMuteAll = () => {
+    if (!active) return;
+    const anyUnmuted = active.audio.some((c) => !c.muted);
+    updateProject(active.id, {
+      audio: active.audio.map((c) => ({ ...c, muted: anyUnmuted })),
+    });
+  };
+
+  const handleDurationChange = (d: number) => {
+    if (!active) return;
+    updateProject(active.id, { duration: d });
+    seek(Math.min(time, d));
+  };
+
+  const selectStyle = (styleId: string | undefined) => {
+    if (!active) return;
+    const preset = STYLE_PRESETS.find((s) => s.id === styleId);
+    if (!preset) {
+      updateProject(active.id, { styleId: undefined });
+      return;
+    }
+    const size = ASPECTS[preset.aspect]!;
+    updateProject(active.id, {
+      styleId: preset.id,
+      aspect: preset.aspect,
+      width: size.w,
+      height: size.h,
+      duration: preset.duration,
+    });
+    seek(0);
   };
 
   const handleExport = async () => {
@@ -126,13 +308,21 @@ function FlowexApp() {
     try {
       const { blob, ext } = await exportVideo(active, (p) => setExporting(p));
       download(blob, `${active.name.replace(/\s+/g, "-").toLowerCase()}.${ext}`);
-      toast.success("Видео готово к скачиванию");
+      toast.success(
+        active.audio.length ? "Видео со звуком готово к скачиванию" : "Видео готово к скачиванию",
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Ошибка экспорта");
     } finally {
       setExporting(null);
     }
   };
+
+  const onSceneError = useCallback((message: string) => {
+    if (sceneErrorRef.current === message) return;
+    sceneErrorRef.current = message;
+    toast.error("Ошибка в коде сцены", { description: message.slice(0, 140) });
+  }, []);
 
   if (!hydrated || !active) {
     return (
@@ -142,44 +332,35 @@ function FlowexApp() {
     );
   }
 
+  const isNewBlank =
+    active.messages.length === 0 && active.scene.js.trim() === blankScene.js.trim();
+  const hints = active.suggestions.length
+    ? active.suggestions
+    : active.messages.length === 0
+      ? STARTER_HINTS
+      : [];
+
+  const sidebarProps = {
+    projects,
+    activeId,
+    onSelect: setActiveId,
+    onCreate: createProject,
+    onDelete: deleteProject,
+    onDuplicate: duplicateProject,
+    onRename: (id: string, name: string) => updateProject(id, { name }),
+    onOpenProjects: () => setSettingsOpen(true),
+  };
+
   return (
     <div className="flex min-h-screen bg-background">
       <div className="hidden h-screen lg:block">
-        <Sidebar
-          projects={projects}
-          activeId={activeId}
-          onSelect={setActiveId}
-          onCreate={createProject}
-          onDelete={deleteProject}
-          onDuplicate={duplicateProject}
-          onRename={(id, name) => updateProject(id, { name })}
-          onOpenProjects={() => setSettingsOpen(true)}
-        />
+        <Sidebar {...sidebarProps} />
       </div>
 
       {navOpen ? (
         <div className="fixed inset-0 z-40 flex lg:hidden">
           <div className="h-full w-[300px] max-w-[85vw] bg-sidebar">
-            <Sidebar
-              projects={projects}
-              activeId={activeId}
-              onSelect={(id) => {
-                setActiveId(id);
-                setNavOpen(false);
-              }}
-              onCreate={() => {
-                createProject();
-                setNavOpen(false);
-              }}
-              onDelete={deleteProject}
-              onDuplicate={duplicateProject}
-              onRename={(id, name) => updateProject(id, { name })}
-              onOpenProjects={() => {
-                setSettingsOpen(true);
-                setNavOpen(false);
-              }}
-              onClose={() => setNavOpen(false)}
-            />
+            <Sidebar {...sidebarProps} onClose={() => setNavOpen(false)} />
           </div>
           <button
             aria-label="Закрыть меню"
@@ -199,6 +380,10 @@ function FlowexApp() {
             <Menu className="h-5 w-5" />
           </button>
           <h1 className="truncate font-display text-lg lg:hidden">{active.name}</h1>
+          <span className="ml-2 hidden rounded-full border border-border px-3 py-1 text-xs tabular-nums text-muted-foreground sm:inline">
+            {active.width}×{active.height} · {active.fps} fps ·{" "}
+            {active.duration.toFixed(active.duration % 1 ? 1 : 0)} с
+          </span>
           <div className="ml-auto flex items-center gap-1.5">
             <button
               onClick={handleExport}
@@ -247,22 +432,53 @@ function FlowexApp() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col gap-6 px-4 pb-10 sm:px-8">
+        <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-3 px-4 pb-10 sm:px-8">
           <Preview
             project={active}
             playing={playing}
-            onTogglePlay={() => setPlaying((p) => !p)}
             time={time}
             seekToken={seekToken}
             onTime={setTime}
+            assetUrls={assetUrls}
+            onError={onSceneError}
           />
-          <Timeline project={active} time={time} onSeek={seek} />
-          <div className="mt-auto pt-6">
+
+          <PlaybackBar
+            playing={playing}
+            onTogglePlay={() => setPlaying((p) => !p)}
+            time={time}
+            duration={active.duration}
+            onSeek={seek}
+            onDurationChange={handleDurationChange}
+            onOpenInspector={() => setInspectorOpen(true)}
+          />
+
+          <Timeline
+            project={active}
+            time={time}
+            onSeek={seek}
+            onUpdateClip={updateClip}
+            onRemoveClip={removeClip}
+            onToggleMuteAll={toggleMuteAll}
+            onAddAudioFiles={handleAttach}
+            onAddVoice={addVoice}
+          />
+
+          <div className="mt-auto pt-4">
             <PromptBar
               settings={settings}
               setSettings={setSettings}
               onSubmit={handlePrompt}
               busy={busy}
+              suggestions={hints}
+              assets={active.assets}
+              onAttach={handleAttach}
+              onRemoveAsset={removeAsset}
+              above={
+                isNewBlank ? (
+                  <StylePicker selectedId={active.styleId} onSelect={selectStyle} />
+                ) : undefined
+              }
             />
           </div>
         </div>
@@ -281,6 +497,12 @@ function FlowexApp() {
         onClose={() => setCodeOpen(false)}
         project={active}
         onApply={(scene) => updateProject(active.id, { scene })}
+      />
+      <Inspector
+        open={inspectorOpen}
+        onClose={() => setInspectorOpen(false)}
+        project={active}
+        onChange={(config: ConfigMap) => updateProject(active.id, { config })}
       />
     </div>
   );

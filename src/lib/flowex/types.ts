@@ -17,7 +17,7 @@ export type Asset = {
   fileName: string;
   mime: string;
   /** seconds, for audio/video */
-  duration?: number;
+  duration?: number | undefined;
   addedAt: number;
 };
 
@@ -57,7 +57,7 @@ export type Project = {
   audio: AudioClip[];
   /** AI-authored follow-up ideas shown above the prompt bar */
   suggestions: string[];
-  styleId?: string;
+  styleId?: string | undefined;
   messages: ChatMessage[];
   createdAt: number;
   updatedAt: number;

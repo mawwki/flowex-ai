@@ -64,7 +64,7 @@ export async function exportVideo(
   const assets = await loadAssets(project);
 
   let drawFrame: Draw | null = null;
-  // eslint-disable-next-line no-new-func
+
   drawFrame = new Function(
     "ASSETS",
     "getAsset",
@@ -87,7 +87,10 @@ export async function exportVideo(
   const scheduled: { buffer: AudioBuffer; start: number; volume: number }[] = [];
 
   if (clips.length) {
-    const AC = window.AudioContext ?? (window as any).webkitAudioContext;
+    const AC =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) throw new Error("Web Audio API недоступна");
     audioCtx = new AC();
     dest = audioCtx.createMediaStreamDestination();
     for (const clip of clips) {

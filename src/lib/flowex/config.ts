@@ -6,10 +6,10 @@ export type ConfigMap = Record<string, ConfigValue>;
 /** Executes the scene code in isolation and returns its CONFIG object (flattened). */
 export function readConfig(js: string): ConfigMap {
   try {
-    // eslint-disable-next-line no-new-func
-    const raw = new Function(`${js}; return typeof CONFIG!=='undefined'?CONFIG:null;`)() as
-      | Record<string, unknown>
-      | null;
+    const raw = new Function(`${js}; return typeof CONFIG!=='undefined'?CONFIG:null;`)() as Record<
+      string,
+      unknown
+    > | null;
     if (!raw || typeof raw !== "object") return {};
     return flatten(raw);
   } catch {

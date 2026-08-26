@@ -9,6 +9,7 @@ export function Preview({
   seekToken,
   onTime,
   assetUrls,
+  onError,
 }: {
   project: Project;
   playing: boolean;
@@ -16,6 +17,7 @@ export function Preview({
   seekToken: number;
   onTime: (t: number) => void;
   assetUrls: Record<string, string>;
+  onError?: (message: string) => void;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -26,12 +28,14 @@ export function Preview({
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
-      const d = e.data as { source?: string; type?: string; t?: number };
-      if (d?.source === "flowex" && d.type === "time" && typeof d.t === "number") onTime(d.t);
+      const d = e.data as { source?: string; type?: string; t?: number; error?: string };
+      if (d?.source !== "flowex") return;
+      if (d.type === "time" && typeof d.t === "number") onTime(d.t);
+      if (d.type === "ready" && d.error) onError?.(d.error);
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [onTime]);
+  }, [onTime, onError]);
 
   const post = (msg: Record<string, unknown>) =>
     ref.current?.contentWindow?.postMessage({ source: "flowex-host", ...msg }, "*");

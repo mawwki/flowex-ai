@@ -103,9 +103,7 @@ export function SettingsDialog({
               </div>
 
               <label className="block space-y-2">
-                <span className="text-sm text-muted-foreground">
-                  API-ключ ({provider.keyHint})
-                </span>
+                <span className="text-sm text-muted-foreground">API-ключ ({provider.keyHint})</span>
                 <input
                   type="password"
                   value={settings.apiKeys[settings.provider] ?? ""}
@@ -283,9 +281,7 @@ export function SettingsDialog({
                   {RESOLUTIONS.map((r) => (
                     <button
                       key={r.label}
-                      onClick={() =>
-                        onProjectChange({ width: r.w, height: r.h, quality: r.label })
-                      }
+                      onClick={() => onProjectChange({ width: r.w, height: r.h, quality: r.label })}
                       className={cn(
                         "rounded-xl border px-4 py-2.5 text-sm",
                         project.quality === r.label
