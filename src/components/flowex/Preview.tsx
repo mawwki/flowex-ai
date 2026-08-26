@@ -58,12 +58,19 @@ export function Preview({
         const el = els.get(clip.id);
         if (!el) continue;
         el.volume = clip.muted ? 0 : clip.volume;
+        const speed = clip.speed && clip.speed > 0 ? clip.speed : 1;
+        if (Math.abs(el.playbackRate - speed) > 0.01) el.playbackRate = speed;
+        const len = clip.length ?? (Number.isFinite(el.duration) ? el.duration : Infinity);
         const local = t - clip.start;
-        const dur = Number.isFinite(el.duration) ? el.duration : Infinity;
-        const inside = local >= 0 && local < dur;
+        const inside = local >= 0 && local < len;
         if (playing && inside && !clip.muted) {
-          if (Math.abs(el.currentTime - local) > 0.25) el.currentTime = local;
-          if (el.paused) el.play().catch(() => {});
+          const srcTime = (clip.offset ?? 0) + local * speed;
+          if (srcTime < (el.duration || Infinity)) {
+            if (Math.abs(el.currentTime - srcTime) > 0.25 * speed) el.currentTime = srcTime;
+            if (el.paused) el.play().catch(() => {});
+          } else if (!el.paused) {
+            el.pause();
+          }
         } else if (!el.paused) {
           el.pause();
         }

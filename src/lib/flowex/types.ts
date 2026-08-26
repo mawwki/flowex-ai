@@ -18,6 +18,8 @@ export type Asset = {
   mime: string;
   /** seconds, for audio/video */
   duration?: number | undefined;
+  width?: number | undefined;
+  height?: number | undefined;
   addedAt: number;
 };
 
@@ -30,7 +32,13 @@ export type AudioClip = {
   volume: number;
   muted: boolean;
   /** voiceover recorded in the app */
-  voice?: boolean;
+  voice?: boolean | undefined;
+  /** seconds skipped from the beginning of the source file */
+  offset?: number | undefined;
+  /** clip length on the timeline; defaults to the whole source */
+  length?: number | undefined;
+  /** playback speed multiplier */
+  speed?: number | undefined;
 };
 
 export type ChatMessage = {

@@ -51,14 +51,3 @@ export async function assetArrayBuffer(id: string): Promise<ArrayBuffer | null> 
   const blob = await getBlob(id).catch(() => undefined);
   return blob ? await blob.arrayBuffer() : null;
 }
-
-/** Reads media duration in the browser. */
-export function mediaDuration(url: string, kind: "audio" | "video"): Promise<number> {
-  return new Promise((resolve) => {
-    const el = document.createElement(kind);
-    el.preload = "metadata";
-    el.onloadedmetadata = () => resolve(Number.isFinite(el.duration) ? el.duration : 0);
-    el.onerror = () => resolve(0);
-    el.src = url;
-  });
-}

@@ -16,6 +16,15 @@ import { generateScene, generateSuggestions } from "@/lib/flowex/providers";
 import { download, exportVideo } from "@/lib/flowex/export";
 import { assetUrl, delBlob, forgetUrl } from "@/lib/flowex/idb";
 import { blobToClip, nextClipStart, processFiles } from "@/lib/flowex/media";
+import {
+  moveScene as reorderScene,
+  parseScenes,
+  removeScene,
+  sceneTotal,
+  setAllDurations,
+  splitClip,
+  syncTotalConstants,
+} from "@/lib/flowex/scenes-edit";
 import { STYLE_PRESETS, STARTER_HINTS } from "@/lib/flowex/styles";
 import { blankScene } from "@/lib/flowex/scenes";
 import type { ConfigMap } from "@/lib/flowex/config";
@@ -277,6 +286,48 @@ function FlowexApp() {
     });
   };
 
+  const applySceneEdit = (newJs: string | null) => {
+    if (!active || !newJs) return;
+    const parsed = parseScenes(newJs);
+    const total = parsed ? sceneTotal(parsed) : active.duration;
+    updateProject(active.id, {
+      scene: { ...active.scene, js: syncTotalConstants(newJs, total) },
+      duration: clampDur(total),
+    });
+    seek(0);
+    toast.success("Сцены обновлены", { description: `Новая длительность: ${clampDur(total)} с` });
+  };
+
+  const setSceneDurations = (durs: number[]) => {
+    if (!active) return;
+    applySceneEdit(setAllDurations(active.scene.js, durs));
+  };
+
+  const moveSceneAt = (index: number, dir: -1 | 1) => {
+    if (!active) return;
+    applySceneEdit(reorderScene(active.scene.js, index, dir));
+  };
+
+  const deleteSceneAt = (index: number) => {
+    if (!active) return;
+    applySceneEdit(removeScene(active.scene.js, index));
+  };
+
+  const splitClipAt = (clipId: string) => {
+    if (!active) return;
+    const clip = active.audio.find((c) => c.id === clipId);
+    if (!clip) return;
+    const parts = splitClip(clip, time);
+    if (!parts) {
+      toast.warning("Плейхед должен быть внутри клипа");
+      return;
+    }
+    updateProject(active.id, {
+      audio: active.audio.flatMap((c) => (c.id === clipId ? [parts.left, parts.right] : [c])),
+    });
+    toast.success("Клип разрезан");
+  };
+
   const handleDurationChange = (d: number) => {
     if (!active) return;
     updateProject(active.id, { duration: d });
@@ -462,6 +513,10 @@ function FlowexApp() {
             onToggleMuteAll={toggleMuteAll}
             onAddAudioFiles={handleAttach}
             onAddVoice={addVoice}
+            onSplitClip={splitClipAt}
+            onSetSceneDurations={setSceneDurations}
+            onMoveScene={moveSceneAt}
+            onDeleteScene={deleteSceneAt}
           />
 
           <div className="mt-auto pt-4">

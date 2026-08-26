@@ -166,6 +166,7 @@ duration обязан совпадать с FX.total(SCENES).
 
 === ТЕХНИЧЕСКИЕ ПРАВИЛА ===
 - Обязательно function drawFrame(ctx, t, w, h). Вспомогательные draw-функции принимают (ctx, s, w, h) где s = результат FX.seq.
+- var SCENES = [...] объявляй в корне кода — редактор таймлайна читает и меняет эти dur (растягивание сцен мышью), поэтому НЕ дублируй общую длительность в других константах; если очень нужно — используй FX.total(SCENES).
 - duration согласована с жанром и равна FX.total(SCENES); если пользователь просит другую длину — пересчитай SCENES пропорционально.
 - Если просят изменить существующую сцену — верни ПОЛНЫЙ обновлённый код целиком, а не диф.
 - Производительность: не больше ~200 draw-операций на кадр, кэшируй градиенты нельзя (t меняется) — но избегай циклов > 500 итераций.
@@ -278,14 +279,22 @@ export async function generateScene(opts: {
   const { settings, prompt, currentJs, duration, aspect, assets = [], audio = [] } = opts;
 
   const media = assets.filter((a) => a.kind !== "audio");
+  const describe = (a: Asset) =>
+    `'${a.name}' — ${a.kind}` +
+    (a.width ? ` ${a.width}×${a.height}px` : "") +
+    (a.duration ? ` ${(Math.round(a.duration * 10) / 10).toFixed(1)}с` : "");
   const assetLine = media.length
-    ? `Доступные ассеты (ASSETS['имя']): ${media
-        .map((a) => `'${a.name}' — ${a.kind}, файл ${a.fileName}`)
-        .join("; ")}`
+    ? `Прикреплённые файлы (ASSETS['имя']): ${media.map(describe).join("; ")}`
     : "Ассетов пользователь не прикрепил — рисуй всё кодом.";
+  const assetTask = media.length
+    ? "Встрой эти файлы в ролик по смыслу запроса: фото — фоном через FX.kenBurns или карточкой FX.img, видео — как живой фон/вставку с обложкой-рамкой. Если файл не подходит для запроса — скажи об этом в notes."
+    : "";
   const audioLine = audio.length
     ? `Аудиодорожки на таймлайне: ${audio
-        .map((c) => `${c.name} с ${c.start.toFixed(1)}с`)
+        .map(
+          (c) =>
+            `${c.name} с ${c.start.toFixed(1)}с (${(c.length ?? 0).toFixed(1)}с${c.speed !== 1 && c.speed ? `, скорость ${c.speed}x` : ""})`,
+        )
         .join("; ")}. Синхронизируй смену сцен с этим ритмом.`
     : "";
 
@@ -293,6 +302,7 @@ export async function generateScene(opts: {
     currentJs ? `Текущий код сцены:\n\n${currentJs}` : "Новый проект, кода ещё нет.",
     `Текущая длительность: ${duration} сек. Формат кадра: ${aspect}.`,
     assetLine,
+    assetTask,
     audioLine,
     `Запрос пользователя: ${prompt}`,
     "Если для запроса нужна другая длительность — верни новое значение duration и согласованный SCENES.",

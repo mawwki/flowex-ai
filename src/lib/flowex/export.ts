@@ -84,7 +84,14 @@ export async function exportVideo(
   const clips = project.audio.filter((c) => !c.muted);
   let audioCtx: AudioContext | null = null;
   let dest: MediaStreamAudioDestinationNode | null = null;
-  const scheduled: { buffer: AudioBuffer; start: number; volume: number }[] = [];
+  const scheduled: {
+    buffer: AudioBuffer;
+    start: number;
+    offset: number;
+    length: number;
+    volume: number;
+    speed: number;
+  }[] = [];
 
   if (clips.length) {
     const AC =
@@ -98,7 +105,15 @@ export async function exportVideo(
       if (!blob) continue;
       try {
         const buffer = await audioCtx.decodeAudioData(await blob.arrayBuffer());
-        scheduled.push({ buffer, start: clip.start, volume: clip.volume });
+        const speed = clip.speed && clip.speed > 0 ? clip.speed : 1;
+        scheduled.push({
+          buffer,
+          start: clip.start,
+          offset: clip.offset ?? 0,
+          length: (clip.length ?? buffer.duration) * speed,
+          volume: clip.volume,
+          speed,
+        });
       } catch {
         /* skip undecodable clip */
       }
@@ -111,8 +126,21 @@ export async function exportVideo(
   }
 
   const fps = project.fps || 30;
-  const stream = canvas.captureStream(0);
-  const track = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack;
+  const supportsManualFrames = (() => {
+    try {
+      const probe = document.createElement("canvas");
+      probe.width = probe.height = 2;
+      const t = probe.captureStream(0).getVideoTracks()[0] as MediaStreamTrack & {
+        requestFrame?: () => void;
+      };
+      return typeof t.requestFrame === "function";
+    } catch {
+      return false;
+    }
+  })();
+  const stream = canvas.captureStream(supportsManualFrames ? 0 : fps);
+  const track = stream.getVideoTracks()[0] as MediaStreamTrack & { requestFrame?: () => void };
+  const pushFrame = () => track.requestFrame?.();
   const out = new MediaStream([track, ...(dest ? dest.stream.getAudioTracks() : [])]);
   const mime = pickMime(!!dest);
   const rec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
@@ -141,10 +169,11 @@ export async function exportVideo(
     for (const s of scheduled) {
       const src = audioCtx.createBufferSource();
       src.buffer = s.buffer;
+      src.playbackRate.value = s.speed;
       const gain = audioCtx.createGain();
       gain.gain.value = s.volume;
       src.connect(gain).connect(dest);
-      src.start(base + Math.max(0, s.start));
+      src.start(base + Math.max(0, s.start), Math.max(0, s.offset), Math.max(0.05, s.length));
     }
   }
 
@@ -156,7 +185,7 @@ export async function exportVideo(
       if (t >= duration) {
         try {
           drawFrame!(ctx, duration, canvas.width, canvas.height);
-          track.requestFrame();
+          pushFrame();
         } catch {
           /* ignore last-frame error */
         }
@@ -170,7 +199,7 @@ export async function exportVideo(
         reject(e instanceof Error ? e : new Error(String(e)));
         return;
       }
-      track.requestFrame();
+      pushFrame();
       onProgress(t / duration);
       setTimeout(step, 1000 / fps);
     };

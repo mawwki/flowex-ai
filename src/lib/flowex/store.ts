@@ -46,10 +46,32 @@ function makeProject(
 function normalize(p: Partial<Project>): Project {
   const aspect = p.aspect ?? "16:9";
   const size = ASPECTS[aspect] ?? ASPECTS["16:9"]!;
+  const duration = p.duration ?? 8;
+  const assets = p.assets ?? [];
+  const audio = (p.audio ?? []).map((c) => {
+    const src = assets.find((x) => x.id === c.assetId);
+    const sourceLen = Math.max(0.3, src?.duration && src.duration > 0 ? src.duration : duration);
+    const offset = c.offset ?? 0;
+    return {
+      id: c.id,
+      assetId: c.assetId,
+      name: c.name,
+      start: c.start ?? 0,
+      volume: c.volume ?? 1,
+      muted: !!c.muted,
+      voice: c.voice,
+      offset,
+      speed: c.speed && c.speed > 0 ? c.speed : 1,
+      length:
+        c.length && c.length > 0
+          ? c.length
+          : Math.max(0.3, Math.min(sourceLen - offset, Math.max(0.3, duration - (c.start ?? 0)))),
+    };
+  });
   return {
     id: p.id ?? uid(),
     name: p.name ?? "Untitled",
-    duration: p.duration ?? 8,
+    duration,
     fps: p.fps ?? 30,
     width: p.width ?? size.w,
     height: p.height ?? size.h,
@@ -57,8 +79,8 @@ function normalize(p: Partial<Project>): Project {
     aspect,
     scene: p.scene ?? blankScene,
     config: p.config ?? {},
-    assets: p.assets ?? [],
-    audio: p.audio ?? [],
+    assets,
+    audio,
     suggestions: p.suggestions ?? [],
     styleId: p.styleId,
     messages: p.messages ?? [],

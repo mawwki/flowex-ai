@@ -1,5 +1,5 @@
 import type { Asset, AudioClip } from "./types";
-import { putBlob, mediaDuration } from "./idb";
+import { putBlob } from "./idb";
 import { uid } from "./store";
 
 export function assetKind(file: File): Asset["kind"] | null {
@@ -39,13 +39,44 @@ export function nextClipStart(
   let t = 0;
   for (const c of audio) {
     const a = assets.find((x) => x.id === c.assetId);
-    const len = Math.min(a?.duration ?? projectDuration, projectDuration);
+    const len = c.length ?? Math.min(a?.duration ?? projectDuration, projectDuration);
     t = Math.max(t, c.start + len);
   }
   return Math.max(0, Math.min(t, Math.max(0, projectDuration - 1)));
 }
 
 export type UploadResult = { assets: Asset[]; clips: AudioClip[]; failed: string[] };
+
+async function imageMeta(url: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => resolve({ width: 0, height: 0 });
+    img.src = url;
+  });
+}
+
+/** Reads media duration and pixel size in the browser. */
+export function mediaMeta(
+  url: string,
+  kind: "audio" | "video" | "image",
+): Promise<{ duration: number; width: number; height: number }> {
+  if (kind === "image") {
+    return imageMeta(url).then((m) => ({ duration: 0, ...m }));
+  }
+  return new Promise((resolve) => {
+    const el = document.createElement(kind);
+    el.preload = "metadata";
+    el.onloadedmetadata = () =>
+      resolve({
+        duration: Number.isFinite(el.duration) ? el.duration : 0,
+        width: (el as HTMLVideoElement).videoWidth,
+        height: (el as HTMLVideoElement).videoHeight,
+      });
+    el.onerror = () => resolve({ duration: 0, width: 0, height: 0 });
+    el.src = url;
+  });
+}
 
 /** Stores files in IndexedDB and builds timeline-ready assets/clips. */
 export async function processFiles(
@@ -65,8 +96,7 @@ export async function processFiles(
     const id = uid();
     await putBlob(id, file).catch(() => undefined);
     const url = URL.createObjectURL(file);
-    const duration =
-      kind === "audio" || kind === "video" ? await mediaDuration(url, kind) : undefined;
+    const meta = await mediaMeta(url, kind);
     URL.revokeObjectURL(url);
 
     const name = uniqueName(baseName(file), names);
@@ -77,13 +107,18 @@ export async function processFiles(
       name,
       fileName: file.name,
       mime: file.type || "application/octet-stream",
-      duration,
+      duration: kind === "audio" || kind === "video" ? meta.duration : undefined,
+      width: meta.width || undefined,
+      height: meta.height || undefined,
       addedAt: Date.now(),
     };
     result.assets.push(asset);
 
     if (kind === "audio") {
-      const len = Math.min(duration && duration > 0 ? duration : 5, opts.projectDuration);
+      const len = Math.min(
+        meta.duration && meta.duration > 0 ? meta.duration : 5,
+        opts.projectDuration,
+      );
       result.clips.push({
         id: uid(),
         assetId: id,
@@ -91,6 +126,9 @@ export async function processFiles(
         start: Math.min(cursor, Math.max(0, opts.projectDuration - len)),
         volume: 1,
         muted: false,
+        offset: 0,
+        speed: 1,
+        length: len,
       });
       cursor += len;
     }
@@ -108,7 +146,7 @@ export async function blobToClip(
   const id = uid();
   await putBlob(id, blob).catch(() => undefined);
   const url = URL.createObjectURL(blob);
-  const duration = await mediaDuration(url, "audio");
+  const meta = await mediaMeta(url, "audio");
   URL.revokeObjectURL(url);
   const asset: Asset = {
     id,
@@ -116,7 +154,7 @@ export async function blobToClip(
     name,
     fileName: `${name}.webm`,
     mime: blob.type || "audio/webm",
-    duration,
+    duration: meta.duration,
     addedAt: Date.now(),
   };
   const clip: AudioClip = {
@@ -127,6 +165,9 @@ export async function blobToClip(
     volume: 1,
     muted: false,
     voice: true,
+    offset: 0,
+    speed: 1,
+    length: meta.duration > 0 ? Math.min(meta.duration, projectDuration) : 5,
   };
   return { asset, clip };
 }
