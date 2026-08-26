@@ -8,24 +8,62 @@ const A_KEY = "flowex.active.v1";
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
+export const ASPECTS: Record<string, { w: number; h: number; label: string }> = {
+  "16:9": { w: 1280, h: 720, label: "16:9 — YouTube" },
+  "9:16": { w: 720, h: 1280, label: "9:16 — Reels / Shorts" },
+  "1:1": { w: 1024, h: 1024, label: "1:1 — квадрат" },
+};
+
 function makeProject(
   name: string,
   duration: number,
   quality: string,
   scene: Project["scene"],
+  aspect: keyof typeof ASPECTS | string = "16:9",
 ): Project {
+  const size = ASPECTS[aspect] ?? ASPECTS["16:9"]!;
   return {
     id: uid(),
     name,
     duration,
     fps: 30,
-    width: 1280,
-    height: 720,
+    width: size.w,
+    height: size.h,
     quality,
+    aspect,
     scene,
+    config: {},
+    assets: [],
+    audio: [],
+    suggestions: [],
     messages: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
+  };
+}
+
+/** Fills in fields missing from projects saved by older versions. */
+function normalize(p: Partial<Project>): Project {
+  const aspect = p.aspect ?? "16:9";
+  const size = ASPECTS[aspect] ?? ASPECTS["16:9"]!;
+  return {
+    id: p.id ?? uid(),
+    name: p.name ?? "Untitled",
+    duration: p.duration ?? 8,
+    fps: p.fps ?? 30,
+    width: p.width ?? size.w,
+    height: p.height ?? size.h,
+    quality: p.quality ?? "1080p",
+    aspect,
+    scene: p.scene ?? blankScene,
+    config: p.config ?? {},
+    assets: p.assets ?? [],
+    audio: p.audio ?? [],
+    suggestions: p.suggestions ?? [],
+    styleId: p.styleId,
+    messages: p.messages ?? [],
+    createdAt: p.createdAt ?? Date.now(),
+    updatedAt: p.updatedAt ?? Date.now(),
   };
 }
 
@@ -48,7 +86,7 @@ export const defaultSettings: Settings = {
   autoPlay: false,
 };
 
-export const newProject = () => makeProject("Untitled", 8, "1080p", blankScene);
+export const newProject = () => makeProject("Untitled", 15, "1080p", blankScene);
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -70,7 +108,7 @@ export function useFlowexStore() {
     let list: Project[] = [];
     try {
       const raw = localStorage.getItem(P_KEY);
-      list = raw ? (JSON.parse(raw) as Project[]) : [];
+      list = raw ? (JSON.parse(raw) as Project[]).map(normalize) : [];
     } catch {
       list = [];
     }
