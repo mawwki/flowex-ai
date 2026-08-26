@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Project } from "@/lib/flowex/types";
 import { buildStageDoc } from "@/lib/flowex/stage";
+import { cn } from "@/lib/utils";
 
 export function Preview({
   project,
@@ -25,6 +26,7 @@ export function Preview({
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const timeRef = useRef(time);
   timeRef.current = time;
+  const [hovered, setHovered] = useState(false);
 
   const post = useCallback((msg: Record<string, unknown>) => {
     ref.current?.contentWindow?.postMessage({ source: "flowex-host", ...msg }, "*");
@@ -102,7 +104,11 @@ export function Preview({
 
   return (
     <div className="panel p-2 sm:p-3">
-      <div className="relative overflow-hidden rounded-2xl bg-black">
+      <div
+        className="relative overflow-hidden rounded-2xl bg-black shadow-lg shadow-black/40"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
         <div
           className="mx-auto w-full"
           style={{ aspectRatio: `${project.width} / ${project.height}`, maxHeight: "62vh" }}
@@ -114,17 +120,42 @@ export function Preview({
             className="h-full w-full border-0"
             sandbox="allow-scripts allow-same-origin"
           />
+
+          {/* Hover gradient + play/pause overlay */}
           {onTogglePlay ? (
-            <button
-              onClick={onTogglePlay}
-              aria-label={playing ? "Пауза" : "Воспроизвести"}
-              title="Клик — пауза / воспроизведение"
-              className="absolute inset-0 z-10 cursor-pointer opacity-0 transition-opacity hover:opacity-100"
-            >
-              <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] text-white/85 backdrop-blur-sm">
-                {playing ? "II пауза" : "▶ играть"}
+            <>
+              {/* Bottom gradient for time indicator */}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
+
+              {/* Center play/pause button — visible on hover or when paused */}
+              <button
+                onClick={onTogglePlay}
+                aria-label={playing ? "Пауза" : "Воспроизвести"}
+                title={playing ? "Пауза (Space)" : "Воспроизвести (Space)"}
+                className={cn(
+                  "absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 backdrop-blur-md transition-all duration-200",
+                  hovered || !playing
+                    ? "opacity-100 scale-100"
+                    : "opacity-0 scale-90 pointer-events-none",
+                )}
+              >
+                {playing ? (
+                  <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="4" width="4" height="16" rx="1" />
+                    <rect x="14" y="4" width="4" height="16" rx="1" />
+                  </svg>
+                ) : (
+                  <svg className="ml-1 h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5.14v14.72a1 1 0 0 0 1.5.86l11.5-7.36a1 1 0 0 0 0-1.72L9.5 4.28A1 1 0 0 0 8 5.14Z" />
+                  </svg>
+                )}
+              </button>
+
+              {/* Time label at bottom-right */}
+              <span className="pointer-events-none absolute right-3 bottom-3 z-10 rounded-full bg-black/50 px-2.5 py-1 font-mono text-[11px] text-white/80 backdrop-blur-sm tabular-nums">
+                {playing ? "▶" : "⏸"} {time.toFixed(1)}с
               </span>
-            </button>
+            </>
           ) : null}
         </div>
       </div>

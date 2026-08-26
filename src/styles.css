@@ -212,6 +212,35 @@ html.light {
   animation: pulse-soft 1.6s ease-in-out infinite;
 }
 
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
 @utility panel {
   background-color: var(--color-surface);
   border-radius: var(--radius-3xl);

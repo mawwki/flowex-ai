@@ -27,6 +27,17 @@ function tickLabel(sec: number) {
 
 const MIN_LEN = 0.3;
 
+const SCENE_COLORS = [
+  "from-violet-600/80 to-violet-800/80",
+  "from-sky-600/80 to-sky-800/80",
+  "from-emerald-600/80 to-emerald-800/80",
+  "from-amber-600/80 to-amber-800/80",
+  "from-rose-600/80 to-rose-800/80",
+  "from-fuchsia-600/80 to-fuchsia-800/80",
+  "from-teal-600/80 to-teal-800/80",
+  "from-orange-600/80 to-orange-800/80",
+];
+
 export function Timeline({
   project,
   time,
@@ -250,6 +261,7 @@ export function Timeline({
 
   return (
     <div className="panel touch-none px-4 py-4 select-none sm:px-6">
+      {/* Time ticks */}
       <div className="relative ml-14 h-5 text-[11px] text-muted-foreground">
         {ticks.map((t) => (
           <span
@@ -263,15 +275,16 @@ export function Timeline({
       </div>
 
       <div className="relative mt-2 space-y-2">
+        {/* Video track */}
         <div className="flex items-center gap-2">
           <div className="flex w-12 shrink-0 items-center justify-between pr-1 text-muted-foreground">
             <Video className="h-4 w-4" />
             <button
               onClick={() => setVideoVisible((v) => !v)}
               aria-label="Показать дорожку видео"
-              className="hover:text-foreground"
+              className="rounded p-0.5 transition hover:bg-surface-2 hover:text-foreground"
             >
-              {videoVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              {videoVisible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
             </button>
           </div>
           <div
@@ -287,7 +300,7 @@ export function Timeline({
               }
               startSeekDrag(e);
             }}
-            className="relative h-14 flex-1 cursor-pointer touch-none overflow-hidden rounded-xl bg-track select-none"
+            className="relative h-14 flex-1 cursor-pointer touch-none overflow-hidden rounded-xl bg-track ring-1 ring-border/50 select-none"
           >
             {videoVisible ? (
               <div className="flex h-full w-full">
@@ -310,17 +323,17 @@ export function Timeline({
                       data-scene-index={i}
                       title={`${scenes?.[i]?.id || `Сцена ${i + 1}`} — клик выбирает сцену`}
                       className={cn(
-                        "absolute top-1 bottom-1 overflow-hidden rounded-lg px-2 text-left text-[10px] font-medium text-white/95 ring-1 backdrop-blur-[1px]",
+                        "absolute top-1 bottom-1 overflow-hidden rounded-lg px-2 text-left text-[10px] font-medium text-white ring-1 backdrop-blur-[2px] transition-all",
                         selectedScene === i
-                          ? "bg-black/45 ring-2 ring-[var(--accent)]"
-                          : "bg-black/30 ring-white/25",
+                          ? "bg-gradient-to-b from-[var(--accent)]/70 to-[var(--accent)]/40 ring-2 ring-[var(--accent)] shadow-md shadow-[var(--accent)]/20"
+                          : `bg-gradient-to-b ${SCENE_COLORS[i % SCENE_COLORS.length]!} ring-white/20 hover:ring-white/40`,
                       )}
                       style={{
                         left: `${(b.left / dur) * 100}%`,
                         width: `${(b.width / dur) * 100}%`,
                       }}
                     >
-                      <span className="block truncate leading-[3rem]">
+                      <span className="block truncate leading-[3rem] drop-shadow-sm">
                         {scenes?.[i]?.id || `Сцена ${i + 1}`} · {Math.round(b.width * 10) / 10}с
                       </span>
                     </div>
@@ -328,10 +341,10 @@ export function Timeline({
                       <span
                         onPointerDown={(e) => startBoundaryDrag(e, i)}
                         title="Тяните, чтобы изменить длину соседних сцен"
-                        className="absolute top-0 bottom-0 z-10 w-2.5 cursor-col-resize"
-                        style={{ left: `calc(${((b.left + b.width) / dur) * 100}% - 5px)` }}
+                        className="absolute top-0 bottom-0 z-10 w-3 cursor-col-resize group/boundary"
+                        style={{ left: `calc(${((b.left + b.width) / dur) * 100}% - 6px)` }}
                       >
-                        <span className="absolute top-1 bottom-1 left-1/2 w-[3px] -translate-x-1/2 rounded-full bg-playhead/70 opacity-40 transition-opacity hover:opacity-100" />
+                        <span className="absolute top-1 bottom-1 left-1/2 w-[3px] -translate-x-1/2 rounded-full bg-playhead/50 transition-all group-hover/boundary:w-1 group-hover/boundary:bg-playhead group-hover/boundary:shadow-sm group-hover/boundary:shadow-playhead/30" />
                       </span>
                     ) : null}
                   </div>
@@ -340,9 +353,10 @@ export function Timeline({
           </div>
         </div>
 
+        {/* Selected scene toolbar */}
         {selectedScene !== null && scenes?.[selectedScene] ? (
-          <div className="ml-14 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-2/60 px-3 py-2 text-xs">
-            <span className="max-w-[140px] truncate font-medium">
+          <div className="ml-14 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-2 text-xs">
+            <span className="max-w-[140px] truncate font-medium text-foreground">
               {scenes[selectedScene]!.id || `Сцена ${selectedScene + 1}`}
             </span>
             <label className="flex items-center gap-1.5">
@@ -359,39 +373,42 @@ export function Timeline({
                     onSetSceneDurations(durs.map((d) => Math.round(d * 100) / 100));
                   }
                 }}
-                className="w-16 rounded-md border border-border bg-surface px-1.5 py-0.5 text-center tabular-nums outline-none"
+                className="w-16 rounded-md border border-border bg-surface px-1.5 py-0.5 text-center tabular-nums outline-none focus:ring-1 focus:ring-ring"
               />
               с
             </label>
-            <button
-              onClick={() => onMoveScene(selectedScene, -1)}
-              disabled={selectedScene === 0}
-              aria-label="Переместить сцену влево"
-              className="rounded-full p-1.5 hover:bg-surface-2 disabled:opacity-40"
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => onMoveScene(selectedScene, 1)}
-              disabled={selectedScene >= scenes.length - 1}
-              aria-label="Переместить сцену вправо"
-              className="rounded-full p-1.5 hover:bg-surface-2 disabled:opacity-40"
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => onMoveScene(selectedScene, -1)}
+                disabled={selectedScene === 0}
+                aria-label="Переместить сцену влево"
+                className="rounded-full p-1.5 transition hover:bg-surface-2 disabled:opacity-30"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => onMoveScene(selectedScene, 1)}
+                disabled={selectedScene >= scenes.length - 1}
+                aria-label="Переместить сцену вправо"
+                className="rounded-full p-1.5 transition hover:bg-surface-2 disabled:opacity-30"
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </button>
+            </div>
             <button
               onClick={() => {
                 onDeleteScene(selectedScene);
                 setSelectedScene(null);
               }}
-              className="flex items-center gap-1 rounded-full px-2 py-1 hover:bg-surface-2 hover:text-destructive"
+              className="flex items-center gap-1 rounded-full px-2 py-1 transition hover:bg-destructive/10 hover:text-destructive"
             >
-              <Trash2 className="h-3.5 w-3.5" /> Удалить сцену
+              <Trash2 className="h-3.5 w-3.5" /> Удалить
             </button>
-            <span className="text-muted-foreground">границы сцен можно тянуть мышью</span>
+            <span className="text-muted-foreground">· тяните границы для смены длительности</span>
           </div>
         ) : null}
 
+        {/* Audio track */}
         <div className="flex items-center gap-2">
           <div className="flex w-12 shrink-0 items-center justify-between pr-1 text-muted-foreground">
             <Music className="h-4 w-4" />
@@ -399,9 +416,13 @@ export function Timeline({
               onClick={onToggleMuteAll}
               aria-label={anyUnmuted ? "Заглушить все дорожки" : "Включить звук дорожек"}
               title={anyUnmuted ? "Заглушить всё" : "Включить звук"}
-              className="hover:text-foreground"
+              className="rounded p-0.5 transition hover:bg-surface-2 hover:text-foreground"
             >
-              {anyUnmuted ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              {anyUnmuted ? (
+                <Volume2 className="h-3.5 w-3.5" />
+              ) : (
+                <VolumeX className="h-3.5 w-3.5" />
+              )}
             </button>
           </div>
           <div
@@ -411,7 +432,7 @@ export function Timeline({
               setSelectedScene(null);
               startSeekDrag(e);
             }}
-            className="relative flex h-11 flex-1 cursor-pointer touch-none items-center overflow-hidden rounded-xl bg-track select-none"
+            className="relative flex h-11 flex-1 cursor-pointer touch-none items-center overflow-hidden rounded-xl bg-track ring-1 ring-border/50 select-none"
           >
             {project.audio.length === 0 ? (
               <button
@@ -429,22 +450,39 @@ export function Timeline({
                     onPointerDown={(e) => clipPointerDown(e, clip, "move")}
                     style={{
                       left: `${(clip.start / dur) * 100}%`,
-                      width: `${Math.max(2, (len / dur) * 100)}%`,
+                      width: `${Math.max(3, (len / dur) * 100)}%`,
                     }}
                     className={cn(
-                      "group absolute top-1 bottom-1 cursor-grab touch-none overflow-hidden rounded-lg ring-1 transition-colors active:cursor-grabbing",
+                      "group absolute top-1 bottom-1 cursor-grab touch-none overflow-hidden rounded-lg ring-1 transition-all active:cursor-grabbing",
                       clip.muted
                         ? "bg-surface-2 text-muted-foreground ring-border"
-                        : "bg-wave/25 text-foreground ring-wave/50",
-                      selectedId === clip.id && "ring-2 ring-[var(--accent)]",
+                        : "bg-gradient-to-r from-wave/20 to-wave/10 text-foreground ring-wave/40 hover:ring-wave/70",
+                      selectedId === clip.id &&
+                        "ring-2 ring-[var(--accent)] shadow-sm shadow-[var(--accent)]/20",
                     )}
                   >
+                    {/* Waveform decoration */}
+                    {!clip.muted ? (
+                      <div className="pointer-events-none absolute inset-0 opacity-30">
+                        <div className="flex h-full items-end gap-px px-1">
+                          {Array.from({ length: Math.max(4, Math.floor(len * 8)) }, (_, j) => (
+                            <div
+                              key={j}
+                              className="w-0.5 rounded-full bg-wave/60"
+                              style={{
+                                height: `${20 + Math.sin(j * 1.3 + (clip.start ?? 0)) * 40 + Math.cos(j * 0.7) * 20}%`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <span
                       onPointerDown={(e) => clipPointerDown(e, clip, "trim-left")}
                       title="Обрезать начало"
-                      className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize bg-gradient-to-r from-black/25 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+                      className="absolute inset-y-0 left-0 z-10 w-2.5 cursor-ew-resize bg-gradient-to-r from-black/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
                     />
-                    <span className="pointer-events-none flex h-full items-center gap-1 truncate px-3 text-[11px]">
+                    <span className="pointer-events-none relative z-[1] flex h-full items-center gap-1 truncate px-3 text-[11px] drop-shadow-sm">
                       {clip.muted ? (
                         <VolumeX className="h-3 w-3 shrink-0" />
                       ) : (
@@ -452,12 +490,14 @@ export function Timeline({
                       )}
                       {clip.voice ? "🎙 " : ""}
                       {clip.name}
-                      {(clip.speed ?? 1) !== 1 ? ` · ${clip.speed}x` : ""}
+                      {(clip.speed ?? 1) !== 1 ? (
+                        <span className="rounded bg-black/30 px-1 text-[9px]">{clip.speed}x</span>
+                      ) : null}
                     </span>
                     <span
                       onPointerDown={(e) => clipPointerDown(e, clip, "trim-right")}
                       title="Обрезать конец"
-                      className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize bg-gradient-to-l from-black/25 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+                      className="absolute inset-y-0 right-0 z-10 w-2.5 cursor-ew-resize bg-gradient-to-l from-black/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
                     />
                   </div>
                 );
@@ -477,11 +517,14 @@ export function Timeline({
           </div>
         </div>
 
+        {/* Selected clip toolbar */}
         {selected ? (
-          <div className="ml-14 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-surface-2/60 px-3 py-2 text-xs">
-            <span className="max-w-[120px] truncate font-medium">{selected.name}</span>
+          <div className="ml-14 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-2 text-xs">
+            <span className="max-w-[120px] truncate font-medium text-foreground">
+              {selected.name}
+            </span>
             <label className="flex items-center gap-2">
-              Громкость
+              <Volume2 className="h-3 w-3 text-muted-foreground" />
               <input
                 type="range"
                 min={0}
@@ -489,14 +532,14 @@ export function Timeline({
                 step={0.05}
                 value={selected.volume}
                 onChange={(e) => onUpdateClip(selected.id, { volume: Number(e.target.value) })}
-                className="w-24 accent-[var(--accent)]"
+                className="w-20 accent-[var(--accent)]"
               />
               <span className="w-9 tabular-nums text-muted-foreground">
                 {Math.round(selected.volume * 100)}%
               </span>
             </label>
             <label className="flex items-center gap-2" title="Ускорение и замедление">
-              Скорость
+              ⏱ Скорость
               <input
                 type="range"
                 min={0.25}
@@ -516,74 +559,85 @@ export function Timeline({
                     ),
                   });
                 }}
-                className="w-24 accent-[var(--accent)]"
+                className="w-20 accent-[var(--accent)]"
               />
               <span className="w-9 tabular-nums text-muted-foreground">{selected.speed ?? 1}x</span>
             </label>
-            <button
-              onClick={() => onUpdateClip(selected.id, { muted: !selected.muted })}
-              className="flex items-center gap-1 rounded-full px-2 py-1 hover:bg-surface-2"
-            >
-              {selected.muted ? (
-                <>
-                  <Volume2 className="h-3.5 w-3.5" /> Включить
-                </>
-              ) : (
-                <>
-                  <VolumeX className="h-3.5 w-3.5" /> Заглушить
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => onSplitClip(selected.id)}
-              disabled={
-                time <= selected.start + 0.15 || time >= selected.start + clipLen(selected) - 0.15
-              }
-              title="Разрезать клип по позиции плейхеда"
-              className="flex items-center gap-1 rounded-full px-2 py-1 hover:bg-surface-2 disabled:opacity-40"
-            >
-              <Scissors className="h-3.5 w-3.5" /> Разрезать здесь
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onUpdateClip(selected.id, { muted: !selected.muted })}
+                className="flex items-center gap-1 rounded-full px-2 py-1 transition hover:bg-surface-2"
+              >
+                {selected.muted ? (
+                  <>
+                    <Volume2 className="h-3.5 w-3.5" /> Вкл
+                  </>
+                ) : (
+                  <>
+                    <VolumeX className="h-3.5 w-3.5" /> Выкл
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => onSplitClip(selected.id)}
+                disabled={
+                  time <= selected.start + 0.15 || time >= selected.start + clipLen(selected) - 0.15
+                }
+                title="Разрезать клип по позиции плейхеда"
+                className="flex items-center gap-1 rounded-full px-2 py-1 transition hover:bg-surface-2 disabled:opacity-30"
+              >
+                <Scissors className="h-3.5 w-3.5" /> Разрезать
+              </button>
+            </div>
             <span className="tabular-nums text-muted-foreground">
-              {selected.start.toFixed(1)}–{(selected.start + clipLen(selected)).toFixed(1)}с · края
-              тянутся, тело перетаскивается
+              {selected.start.toFixed(1)}–{(selected.start + clipLen(selected)).toFixed(1)}с
             </span>
             <button
               onClick={() => {
                 onRemoveClip(selected.id);
                 setSelectedId(null);
               }}
-              className="ml-auto flex items-center gap-1 rounded-full px-2 py-1 hover:bg-surface-2 hover:text-destructive"
+              className="ml-auto flex items-center gap-1 rounded-full px-2 py-1 transition hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 className="h-3.5 w-3.5" /> Удалить
             </button>
           </div>
         ) : null}
 
+        {/* Recording button */}
         <div className="ml-14 mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground">
           <button
             onClick={toggleRecording}
             className={cn(
-              "flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 transition hover:bg-surface-2",
-              recording && "border-destructive/60 text-destructive",
+              "flex items-center gap-1.5 rounded-full border px-3 py-1.5 transition-all",
+              recording
+                ? "border-destructive/60 bg-destructive/10 text-destructive"
+                : "border-border hover:border-border/80 hover:bg-surface-2",
             )}
           >
             <Mic className="h-3.5 w-3.5" />
-            {recording ? `Остановить запись · ${recSeconds}с` : "Записать озвучку с микрофона"}
             {recording ? (
-              <span className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
-            ) : null}
+              <>
+                Запись · {recSeconds}с
+                <span className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
+              </>
+            ) : (
+              "Записать озвучку"
+            )}
           </button>
           {recording ? (
-            <span>запись начнётся на таймлайне с {voiceStartRef.current.toFixed(1)}с</span>
+            <span className="text-muted-foreground">
+              старт с {voiceStartRef.current.toFixed(1)}с
+            </span>
           ) : null}
         </div>
 
+        {/* Playhead */}
         <div
           className="pointer-events-none absolute top-0 bottom-0 w-px bg-playhead"
           style={{ left: `calc(3.5rem + (100% - 3.5rem) * ${pct / 100})` }}
         >
-          <span className="absolute -top-2 -left-[5px] h-3 w-[11px] rounded-sm bg-playhead" />
+          <span className="absolute -top-1 -left-[5px] h-3.5 w-[11px] rounded-b-sm bg-playhead shadow-sm shadow-playhead/40" />
         </div>
       </div>
     </div>

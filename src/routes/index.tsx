@@ -393,7 +393,10 @@ function FlowexApp() {
   if (!hydrated || !active) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)]" />
+          <p className="text-sm text-muted-foreground">Загрузка…</p>
+        </div>
       </div>
     );
   }
@@ -419,10 +422,12 @@ function FlowexApp() {
 
   return (
     <div className="flex min-h-screen bg-background">
+      {/* Sidebar */}
       <div className="hidden h-screen lg:block">
         <Sidebar {...sidebarProps} />
       </div>
 
+      {/* Mobile sidebar overlay */}
       {navOpen ? (
         <div className="fixed inset-0 z-40 flex lg:hidden">
           <div className="h-full w-[300px] max-w-[85vw] bg-sidebar">
@@ -430,54 +435,57 @@ function FlowexApp() {
           </div>
           <button
             aria-label="Закрыть меню"
-            className="flex-1 bg-black/60"
+            className="flex-1 bg-black/60 backdrop-blur-sm"
             onClick={() => setNavOpen(false)}
           />
         </div>
       ) : null}
 
+      {/* Main content */}
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 px-4 py-4 sm:px-8">
+        {/* Header */}
+        <header className="flex items-center gap-3 border-b border-border/30 px-4 py-3 sm:px-8">
           <button
             onClick={() => setNavOpen(true)}
             aria-label="Меню проектов"
-            className="rounded-full p-2 hover:bg-surface-2 lg:hidden"
+            className="rounded-full p-2 transition-colors hover:bg-surface-2 lg:hidden"
           >
             <Menu className="h-5 w-5" />
           </button>
-          <h1 className="truncate font-display text-lg lg:hidden">{active.name}</h1>
-          <span className="ml-2 hidden rounded-full border border-border px-3 py-1 text-xs tabular-nums text-muted-foreground sm:inline">
+          <h1 className="truncate font-display text-lg font-semibold lg:hidden">{active.name}</h1>
+          <span className="ml-2 hidden rounded-full border border-border/60 bg-surface-2/30 px-3 py-1 text-xs tabular-nums text-muted-foreground sm:inline">
             {active.width}×{active.height} · {active.fps} fps ·{" "}
-            {active.duration.toFixed(active.duration % 1 ? 1 : 0)} с
+            {active.duration.toFixed(active.duration % 1 ? 1 : 0)}с
           </span>
           <div className="ml-auto flex items-center gap-1.5">
             <button
               onClick={handleExport}
               disabled={exporting !== null}
-              className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-surface-2 disabled:opacity-60"
+              className="flex items-center gap-2 rounded-full border border-border/60 bg-surface-2/30 px-4 py-2 text-sm font-medium transition-all hover:bg-surface-2 disabled:opacity-50"
             >
               {exporting !== null ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {Math.round(exporting * 100)}%
+                  <span className="tabular-nums">{Math.round(exporting * 100)}%</span>
                 </>
               ) : (
                 <>
-                  <Download className="h-4 w-4" /> Скачать
+                  <Download className="h-4 w-4" /> Экспорт
                 </>
               )}
             </button>
             <button
               onClick={() => setCodeOpen(true)}
               aria-label="Редактор кода"
-              className="rounded-full p-2.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+              title="Код сцены"
+              className="rounded-full p-2.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
             >
               <Code2 className="h-5 w-5" />
             </button>
             <button
               onClick={() => setSettingsOpen(true)}
               aria-label="Настройки"
-              className="rounded-full p-2.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+              className="rounded-full p-2.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
             >
               <Settings className="h-5 w-5" />
             </button>
@@ -486,7 +494,7 @@ function FlowexApp() {
                 setSettings((s) => ({ ...s, theme: s.theme === "dark" ? "light" : "dark" }))
               }
               aria-label="Сменить тему"
-              className="rounded-full p-2.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+              className="rounded-full p-2.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
             >
               {settings.theme === "dark" ? (
                 <Moon className="h-5 w-5" />
@@ -494,10 +502,11 @@ function FlowexApp() {
                 <Sun className="h-5 w-5" />
               )}
             </button>
-            <span className="ml-1 h-9 w-9 overflow-hidden rounded-full bg-gradient-to-br from-[var(--accent)] to-surface-2 ring-1 ring-border" />
+            <div className="ml-1 h-9 w-9 overflow-hidden rounded-full bg-gradient-to-br from-[var(--accent)] to-surface-2 ring-1 ring-border/50" />
           </div>
         </header>
 
+        {/* Editor area */}
         <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-3 px-4 pb-10 sm:px-8">
           <Preview
             project={active}
@@ -555,6 +564,30 @@ function FlowexApp() {
         </div>
       </main>
 
+      {/* Export progress overlay */}
+      {exporting !== null ? (
+        <div className="fixed inset-x-0 bottom-0 z-50 p-4">
+          <div className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-border bg-surface/95 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center gap-4 px-5 py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-[var(--accent)]" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Экспорт видео…</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {Math.round(exporting * 100)}% — это может занять несколько минут
+                </p>
+              </div>
+            </div>
+            <div className="h-1 bg-track">
+              <div
+                className="h-full bg-[var(--accent)] transition-all duration-300"
+                style={{ width: `${exporting * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Dialogs */}
       <SettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

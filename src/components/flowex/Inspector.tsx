@@ -14,26 +14,37 @@ function Field({
 }) {
   const label = k.split(".").slice(-1)[0]!;
   const inputCls =
-    "w-full rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring";
+    "w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent)]/30";
 
   if (typeof value === "boolean") {
     return (
-      <label className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2.5">
-        <span className="truncate text-sm">{label}</span>
-        <input
-          type="checkbox"
-          checked={value}
-          onChange={(e) => onChange(e.target.checked)}
-          className="h-5 w-5 shrink-0 accent-[var(--accent)]"
-        />
+      <label className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-surface-2/30 px-3 py-3 transition-colors hover:bg-surface-2/50">
+        <span className="truncate text-sm font-medium">{label}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={value}
+          onClick={() => onChange(!value)}
+          className={cn(
+            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors",
+            value ? "bg-[var(--accent)]" : "bg-track",
+          )}
+        >
+          <span
+            className={cn(
+              "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+              value ? "translate-x-6" : "translate-x-1",
+            )}
+          />
+        </button>
       </label>
     );
   }
 
   if (typeof value === "number") {
     return (
-      <label className="block space-y-1">
-        <span className="block truncate text-xs text-muted-foreground">{label}</span>
+      <label className="block space-y-1.5">
+        <span className="block truncate text-xs font-medium text-muted-foreground">{label}</span>
         <input
           type="number"
           step="any"
@@ -46,28 +57,32 @@ function Field({
   }
 
   return (
-    <label className="block space-y-1">
-      <span className="block truncate text-xs text-muted-foreground">{k}</span>
+    <label className="block space-y-1.5">
+      <span className="block truncate text-xs font-medium text-muted-foreground">{k}</span>
       {isColor(value) ? (
-        <span className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <input
             type="color"
             value={value.slice(0, 7)}
             onChange={(e) => onChange(e.target.value)}
             aria-label={`Цвет ${label}`}
-            className="h-9 w-10 shrink-0 cursor-pointer rounded-lg border border-border bg-transparent p-0.5"
+            className="h-10 w-10 shrink-0 cursor-pointer rounded-xl border border-border bg-transparent p-0.5 transition-shadow hover:shadow-md hover:shadow-black/10"
           />
           <input
             value={value}
             onChange={(e) => onChange(e.target.value)}
             className={`${inputCls} font-mono text-xs`}
           />
-        </span>
+        </div>
       ) : (
         <input value={value} onChange={(e) => onChange(e.target.value)} className={inputCls} />
       )}
     </label>
   );
+}
+
+function cn(...classes: (string | boolean | undefined)[]) {
+  return classes.filter(Boolean).join(" ");
 }
 
 export function Inspector({
@@ -105,15 +120,15 @@ export function Inspector({
       <div className="panel flex max-h-[86vh] w-full max-w-xl flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="font-display text-lg">Инспектор сцены</h2>
-            <p className="text-xs text-muted-foreground">
+            <h2 className="font-display text-lg font-semibold">Инспектор сцены</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
               Ручной контроль: цвета, тексты и параметры из var CONFIG
             </p>
           </div>
           <button
             onClick={onClose}
             aria-label="Закрыть инспектор"
-            className="rounded-full p-2 text-muted-foreground hover:bg-surface-2"
+            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>
@@ -121,17 +136,34 @@ export function Inspector({
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {groups.size === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              В коде сцены нет var CONFIG — попросите ИИ добавить настраиваемые поля или
-              отредактируйте код вручную.
-            </p>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="mb-3 rounded-2xl bg-surface-2 p-4">
+                <svg
+                  className="h-8 w-8 text-muted-foreground"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" />
+                </svg>
+              </div>
+              <p className="text-sm text-muted-foreground">В коде сцены нет var CONFIG</p>
+              <p className="mt-1 text-xs text-muted-foreground/60">
+                Попросите ИИ добавить настраиваемые поля
+              </p>
+            </div>
           ) : (
             <div className="space-y-6">
               {[...groups.entries()].map(([group, fields]) => (
-                <section key={group} className="space-y-2">
-                  <p className="text-[11px] tracking-[0.16em] text-muted-foreground uppercase">
-                    {group}
-                  </p>
+                <section key={group}>
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="h-px flex-1 bg-border/50" />
+                    <p className="text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                      {group}
+                    </p>
+                    <div className="h-px flex-1 bg-border/50" />
+                  </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {fields.map((f) => (
                       <div key={f.key} className="relative">
@@ -148,7 +180,7 @@ export function Inspector({
                               delete next[f.key];
                               onChange(next);
                             }}
-                            className="absolute -top-1.5 -right-1.5 rounded-full bg-surface-2 p-1 text-muted-foreground ring-1 ring-border hover:text-foreground"
+                            className="absolute -top-1.5 -right-1.5 rounded-full bg-surface-2 p-1 text-muted-foreground ring-1 ring-border transition-colors hover:bg-surface hover:text-foreground"
                           >
                             <RotateCcw className="h-3 w-3" />
                           </button>
@@ -166,13 +198,13 @@ export function Inspector({
           <button
             onClick={() => onChange({})}
             disabled={!Object.keys(overrides).length}
-            className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground disabled:opacity-40"
+            className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground disabled:opacity-30"
           >
             Сбросить всё
           </button>
           <button
             onClick={onClose}
-            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground"
+            className="rounded-full bg-[var(--accent)] px-6 py-2 text-sm font-medium text-white shadow-md shadow-[var(--accent)]/25 transition-all hover:shadow-lg hover:shadow-[var(--accent)]/30"
           >
             Готово
           </button>

@@ -1,5 +1,6 @@
 import { Pause, Play, RotateCcw, RotateCw, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 
 function fmt(sec: number) {
   const s = Math.max(0, sec);
@@ -50,43 +51,48 @@ export function PlaybackBar({
     else setDraft(fmt(duration));
   };
 
-  const ghost =
-    "rounded-full p-2 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground";
+  const pct = duration > 0 ? (time / duration) * 100 : 0;
 
   return (
-    <div
-      className="flex items-center justify-center gap-1"
-      role="group"
-      aria-label="Управление воспроизведением"
-    >
+    <div className="flex items-center gap-3" role="group" aria-label="Управление воспроизведением">
+      {/* Previous 5s */}
       <button
         onClick={() => onSeek(Math.max(0, time - 5))}
         aria-label="Назад на 5 секунд"
-        title="−5 с"
-        className={ghost}
+        title="−5 с (Shift+←)"
+        className="rounded-full p-2 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
       >
         <RotateCcw className="h-4 w-4" />
       </button>
 
+      {/* Play/Pause — prominent */}
       <button
         onClick={onTogglePlay}
         aria-label={playing ? "Пауза" : "Воспроизвести"}
-        className="mx-0.5 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-transparent transition hover:border-transparent hover:bg-surface-2"
+        title={playing ? "Пауза (Space)" : "Воспроизвести (Space)"}
+        className={cn(
+          "flex h-11 w-11 items-center justify-center rounded-full transition-all duration-150",
+          playing
+            ? "bg-foreground text-background shadow-lg shadow-foreground/20 hover:scale-105"
+            : "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30 hover:scale-105",
+        )}
       >
-        {playing ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
+        {playing ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
       </button>
 
+      {/* Next 5s */}
       <button
         onClick={() => onSeek(Math.min(duration, time + 5))}
         aria-label="Вперёд на 5 секунд"
-        title="+5 с"
-        className={ghost}
+        title="+5 с (Shift+→)"
+        className="rounded-full p-2 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
       >
         <RotateCw className="h-4 w-4" />
       </button>
 
-      <div className="ml-3 flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
-        <span className="text-foreground">{fmt(time)}</span>
+      {/* Time display */}
+      <div className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground">
+        <span className="text-foreground font-medium">{fmt(time)}</span>
         <span>/</span>
         {editing ? (
           <input
@@ -95,7 +101,7 @@ export function PlaybackBar({
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
             onKeyDown={(e) => e.key === "Enter" && commit()}
-            className="w-16 rounded-md border border-border bg-surface px-1.5 py-0.5 text-center outline-none"
+            className="w-16 rounded-md border border-border bg-surface-2 px-1.5 py-0.5 text-center tabular-nums outline-none focus:ring-1 focus:ring-ring"
             aria-label="Длительность в секундах"
           />
         ) : (
@@ -105,18 +111,39 @@ export function PlaybackBar({
               setEditing(true);
             }}
             title="Изменить длительность ролика"
-            className="rounded-md px-1 py-0.5 underline decoration-dotted decoration-border underline-offset-4 hover:bg-surface-2 hover:text-foreground"
+            className="rounded-md px-1.5 py-0.5 underline decoration-dotted decoration-border underline-offset-4 transition hover:bg-surface-2 hover:text-foreground"
           >
             {fmt(duration)}
           </button>
         )}
       </div>
 
+      {/* Mini progress scrubber */}
+      <div className="mx-2 hidden flex-1 sm:block">
+        <div
+          className="relative h-1.5 w-full cursor-pointer rounded-full bg-track"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            onSeek(Math.max(0, Math.min(duration, ((e.clientX - r.left) / r.width) * duration)));
+          }}
+        >
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-[var(--accent)]"
+            style={{ width: `${pct}%` }}
+          />
+          <div
+            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground shadow-sm ring-2 ring-background"
+            style={{ left: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Inspector */}
       <button
         onClick={onOpenInspector}
         aria-label="Инспектор сцены"
         title="Инспектор CONFIG — цвета, тексты, параметры"
-        className={`${ghost} ml-2`}
+        className="rounded-full p-2 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
       >
         <SlidersHorizontal className="h-4 w-4" />
       </button>

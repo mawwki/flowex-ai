@@ -13,10 +13,10 @@ const ACCENTS: { id: string; label: string; value: string }[] = [
 ];
 
 const RESOLUTIONS = [
-  { label: "720p", w: 1280, h: 720 },
-  { label: "1080p", w: 1920, h: 1080 },
-  { label: "4K HDR", w: 2560, h: 1440 },
-  { label: "Vertical 9:16", w: 720, h: 1280 },
+  { label: "720p", w: 1280, h: 720, desc: "HD" },
+  { label: "1080p", w: 1920, h: 1080, desc: "Full HD" },
+  { label: "4K HDR", w: 2560, h: 1440, desc: "Quad HD" },
+  { label: "9:16", w: 720, h: 1280, desc: "Вертик." },
 ];
 
 type Tab = "providers" | "style" | "project";
@@ -45,21 +45,22 @@ export function SettingsDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="panel flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="font-display text-xl">Настройки</h2>
+          <h2 className="font-display text-xl font-semibold">Настройки</h2>
           <button
             onClick={onClose}
             aria-label="Закрыть настройки"
-            className="rounded-full p-2 text-muted-foreground hover:bg-surface-2"
+            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex gap-2 px-6 pt-4">
+        {/* Tabs */}
+        <div className="flex gap-1 px-6 pt-4">
           {(
             [
-              ["providers", "Провайдеры и модели"],
-              ["style", "Стили"],
+              ["providers", "Провайдеры"],
+              ["style", "Стиль"],
               ["project", "Проект"],
             ] as [Tab, string][]
           ).map(([id, label]) => (
@@ -67,8 +68,10 @@ export function SettingsDialog({
               key={id}
               onClick={() => setTab(id)}
               className={cn(
-                "rounded-full px-4 py-2 text-sm transition",
-                tab === id ? "bg-surface-2 text-foreground" : "text-muted-foreground",
+                "rounded-full px-4 py-2 text-sm font-medium transition-all",
+                tab === id
+                  ? "bg-surface-2 text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-surface-2/50 hover:text-foreground",
               )}
             >
               {label}
@@ -79,6 +82,7 @@ export function SettingsDialog({
         <div className="overflow-y-auto px-6 py-5">
           {tab === "providers" ? (
             <div className="space-y-5">
+              {/* Provider grid */}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {PROVIDERS.map((p) => (
                   <button
@@ -91,10 +95,10 @@ export function SettingsDialog({
                       }))
                     }
                     className={cn(
-                      "rounded-xl border px-3 py-2.5 text-sm transition",
+                      "rounded-xl border px-3 py-3 text-sm font-medium transition-all",
                       settings.provider === p.id
-                        ? "border-transparent bg-surface-2 ring-1 ring-ring"
-                        : "border-border hover:bg-surface-2",
+                        ? "border-[var(--accent)]/50 bg-[var(--accent)]/10 text-foreground shadow-sm"
+                        : "border-border/60 hover:border-border hover:bg-surface-2/50",
                     )}
                   >
                     {p.label}
@@ -102,8 +106,11 @@ export function SettingsDialog({
                 ))}
               </div>
 
+              {/* API key */}
               <label className="block space-y-2">
-                <span className="text-sm text-muted-foreground">API-ключ ({provider.keyHint})</span>
+                <span className="text-sm font-medium text-muted-foreground">
+                  API-ключ ({provider.keyHint})
+                </span>
                 <input
                   type="password"
                   value={settings.apiKeys[settings.provider] ?? ""}
@@ -114,38 +121,40 @@ export function SettingsDialog({
                     }))
                   }
                   placeholder={provider.keyHint}
-                  className="w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent)]/30"
                 />
                 {provider.keyUrl ? (
                   <a
                     href={provider.keyUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
                   >
                     Получить ключ <ExternalLink className="h-3 w-3" />
                   </a>
                 ) : null}
               </label>
 
+              {/* Custom base URL */}
               {settings.provider === "custom" ? (
                 <label className="block space-y-2">
-                  <span className="text-sm text-muted-foreground">Base URL</span>
+                  <span className="text-sm font-medium text-muted-foreground">Base URL</span>
                   <input
                     value={settings.customBaseUrl}
                     onChange={(e) => setSettings((s) => ({ ...s, customBaseUrl: e.target.value }))}
                     placeholder="https://my-gateway/v1"
-                    className="w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm outline-none"
+                    className="w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent)]/30"
                   />
                 </label>
               ) : null}
 
+              {/* Model select */}
               <label className="block space-y-2">
-                <span className="text-sm text-muted-foreground">Модель</span>
+                <span className="text-sm font-medium text-muted-foreground">Модель</span>
                 <select
                   value={settings.model}
                   onChange={(e) => setSettings((s) => ({ ...s, model: e.target.value }))}
-                  className="w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm outline-none"
+                  className="w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--accent)]/50"
                 >
                   {modelsFor(settings, settings.provider).map((m) => (
                     <option key={m} value={m}>
@@ -155,12 +164,13 @@ export function SettingsDialog({
                 </select>
               </label>
 
+              {/* Add custom model */}
               <div className="flex gap-2">
                 <input
                   value={newModel}
                   onChange={(e) => setNewModel(e.target.value)}
                   placeholder="Добавить свою модель"
-                  className="flex-1 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm outline-none"
+                  className="flex-1 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent)]/30"
                 />
                 <button
                   onClick={() => {
@@ -176,12 +186,12 @@ export function SettingsDialog({
                     }));
                     setNewModel("");
                   }}
-                  className="rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground"
+                  className="rounded-xl bg-[var(--accent)] px-5 text-sm font-medium text-white shadow-sm shadow-[var(--accent)]/25 transition-all hover:shadow-md hover:shadow-[var(--accent)]/30"
                 >
                   Добавить
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground/60">
                 Ключи хранятся только в вашем браузере (localStorage) и отправляются напрямую
                 провайдеру.
               </p>
@@ -190,18 +200,19 @@ export function SettingsDialog({
 
           {tab === "style" ? (
             <div className="space-y-6">
+              {/* Theme */}
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Тема</p>
+                <p className="text-sm font-medium text-muted-foreground">Тема</p>
                 <div className="flex gap-2">
                   {(["dark", "light"] as const).map((t) => (
                     <button
                       key={t}
                       onClick={() => setSettings((s) => ({ ...s, theme: t }))}
                       className={cn(
-                        "rounded-xl border px-4 py-2.5 text-sm",
+                        "rounded-xl border px-5 py-2.5 text-sm font-medium transition-all",
                         settings.theme === t
-                          ? "border-transparent bg-surface-2 ring-1 ring-ring"
-                          : "border-border",
+                          ? "border-[var(--accent)]/50 bg-[var(--accent)]/10 text-foreground shadow-sm"
+                          : "border-border/60 text-muted-foreground hover:border-border hover:bg-surface-2/50",
                       )}
                     >
                       {t === "dark" ? "Тёмная" : "Светлая"}
@@ -209,8 +220,10 @@ export function SettingsDialog({
                   ))}
                 </div>
               </div>
+
+              {/* Accent colors */}
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Акцентный цвет</p>
+                <p className="text-sm font-medium text-muted-foreground">Акцентный цвет</p>
                 <div className="flex flex-wrap gap-3">
                   {ACCENTS.map((a) => (
                     <button
@@ -218,22 +231,51 @@ export function SettingsDialog({
                       onClick={() => setSettings((s) => ({ ...s, accent: a.id }))}
                       aria-label={a.label}
                       className={cn(
-                        "h-10 w-10 rounded-full ring-offset-2 ring-offset-surface",
-                        settings.accent === a.id && "ring-2 ring-ring",
+                        "relative h-10 w-10 rounded-full transition-all",
+                        settings.accent === a.id
+                          ? "ring-2 ring-ring ring-offset-2 ring-offset-surface scale-110"
+                          : "ring-1 ring-border/50 hover:ring-border hover:scale-105",
                       )}
                       style={{ background: a.value }}
-                    />
+                    >
+                      {settings.accent === a.id ? (
+                        <span className="absolute inset-0 flex items-center justify-center rounded-full bg-white/20">
+                          <svg
+                            className="h-4 w-4 text-white"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                          >
+                            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
+                      ) : null}
+                    </button>
                   ))}
                 </div>
               </div>
-              <label className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-                <span className="text-sm">Автовоспроизведение при открытии проекта</span>
-                <input
-                  type="checkbox"
-                  checked={settings.autoPlay}
-                  onChange={(e) => setSettings((s) => ({ ...s, autoPlay: e.target.checked }))}
-                  className="h-5 w-5 accent-[var(--accent)]"
-                />
+
+              {/* Auto-play */}
+              <label className="flex items-center justify-between rounded-xl border border-border/60 bg-surface-2/30 px-4 py-3 transition-colors hover:bg-surface-2/50">
+                <span className="text-sm font-medium">Автовоспроизведение</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.autoPlay}
+                  onClick={() => setSettings((s) => ({ ...s, autoPlay: !s.autoPlay }))}
+                  className={cn(
+                    "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors",
+                    settings.autoPlay ? "bg-[var(--accent)]" : "bg-track",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                      settings.autoPlay ? "translate-x-6" : "translate-x-1",
+                    )}
+                  />
+                </button>
               </label>
             </div>
           ) : null}
@@ -241,17 +283,17 @@ export function SettingsDialog({
           {tab === "project" && project ? (
             <div className="space-y-5">
               <label className="block space-y-2">
-                <span className="text-sm text-muted-foreground">Название</span>
+                <span className="text-sm font-medium text-muted-foreground">Название</span>
                 <input
                   value={project.name}
                   onChange={(e) => onProjectChange({ name: e.target.value })}
-                  className="w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm outline-none"
+                  className="w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent)]/30"
                 />
               </label>
               <div className="grid grid-cols-2 gap-4">
                 <label className="block space-y-2">
-                  <span className="text-sm text-muted-foreground">
-                    Длительность: {project.duration} с
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Длительность: <span className="tabular-nums">{project.duration}</span> с
                   </span>
                   <input
                     type="range"
@@ -263,7 +305,9 @@ export function SettingsDialog({
                   />
                 </label>
                 <label className="block space-y-2">
-                  <span className="text-sm text-muted-foreground">FPS: {project.fps}</span>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    FPS: <span className="tabular-nums">{project.fps}</span>
+                  </span>
                   <input
                     type="range"
                     min={12}
@@ -276,20 +320,21 @@ export function SettingsDialog({
                 </label>
               </div>
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Разрешение</p>
-                <div className="flex flex-wrap gap-2">
+                <p className="text-sm font-medium text-muted-foreground">Разрешение</p>
+                <div className="grid grid-cols-2 gap-2">
                   {RESOLUTIONS.map((r) => (
                     <button
                       key={r.label}
                       onClick={() => onProjectChange({ width: r.w, height: r.h, quality: r.label })}
                       className={cn(
-                        "rounded-xl border px-4 py-2.5 text-sm",
+                        "flex flex-col items-center rounded-xl border px-4 py-3 text-sm transition-all",
                         project.quality === r.label
-                          ? "border-transparent bg-surface-2 ring-1 ring-ring"
-                          : "border-border",
+                          ? "border-[var(--accent)]/50 bg-[var(--accent)]/10 shadow-sm"
+                          : "border-border/60 hover:border-border hover:bg-surface-2/50",
                       )}
                     >
-                      {r.label}
+                      <span className="font-medium">{r.label}</span>
+                      <span className="text-[10px] text-muted-foreground">{r.desc}</span>
                     </button>
                   ))}
                 </div>
