@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Project } from "@/lib/flowex/types";
 import { buildStageDoc } from "@/lib/flowex/stage";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,8 @@ export function Preview({
   assetUrls,
   onError,
   onTogglePlay,
+  busy,
+  children,
 }: {
   project: Project;
   playing: boolean;
@@ -21,6 +23,8 @@ export function Preview({
   assetUrls: Record<string, string>;
   onError?: (message: string) => void;
   onTogglePlay?: () => void;
+  busy?: boolean;
+  children?: ReactNode;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -120,6 +124,24 @@ export function Preview({
             className="h-full w-full border-0"
             sandbox="allow-scripts allow-same-origin"
           />
+
+          {/* Drag-and-drop element overlay */}
+          {children}
+
+          {/* AI generating overlay */}
+          {busy ? (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm">
+              <div className="flex items-center gap-3 rounded-2xl border border-border/40 bg-surface/90 px-5 py-4 shadow-xl">
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+                <div>
+                  <p className="text-sm font-medium">ИИ создаёт сцену…</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    формируем дизайн, шрифты и анимации
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {/* Hover gradient + play/pause overlay */}
           {onTogglePlay ? (

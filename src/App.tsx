@@ -13,6 +13,8 @@ import { StylePicker } from "@/components/flowex/StylePicker";
 import { CreationWizard, type WizardDraft } from "@/components/flowex/CreationWizard";
 import { Inspector } from "@/components/flowex/Inspector";
 import { Library } from "@/components/flowex/Library";
+import { ElementOverlay } from "@/components/flowex/ElementOverlay";
+import { ElementInspector } from "@/components/flowex/ElementInspector";
 import { useFlowexStore, uid, ASPECTS } from "@/lib/flowex/store";
 import { generateScene, generateSuggestions } from "@/lib/flowex/providers";
 import { download, exportVideo } from "@/lib/flowex/export";
@@ -30,7 +32,7 @@ import {
 import { STYLE_PRESETS, STARTER_HINTS } from "@/lib/flowex/styles";
 import { blankScene } from "@/lib/flowex/scenes";
 import type { ConfigMap } from "@/lib/flowex/config";
-import type { AudioClip, Project } from "@/lib/flowex/types";
+import type { AudioClip, Project, SceneElement } from "@/lib/flowex/types";
 
 const clampDur = (d: number) => Math.max(1, Math.min(300, d));
 
@@ -60,6 +62,8 @@ export function App() {
   const [codeOpen, setCodeOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [elementInspectorOpen, setElementInspectorOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const sceneErrorRef = useRef("");
@@ -435,6 +439,70 @@ export function App() {
     }
   };
 
+  // ── Element (overlay) management ──────────────────────────────────
+  const updateElement = useCallback(
+    (id: string, patch: Partial<SceneElement>) => {
+      if (!active) return;
+      updateProject(active.id, {
+        elements: active.elements.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+      });
+    },
+    [active, updateProject],
+  );
+
+  const removeElement = useCallback(
+    (id: string) => {
+      if (!active) return;
+      updateProject(active.id, {
+        elements: active.elements.filter((e) => e.id !== id),
+      });
+      setSelectedElementId((cur) => (cur === id ? null : cur));
+    },
+    [active, updateProject],
+  );
+
+  const bringForward = useCallback(
+    (id: string) => {
+      if (!active) return;
+      const max = active.elements.reduce((m, e) => Math.max(m, e.z ?? 0), 0);
+      updateElement(id, { z: max + 1 });
+    },
+    [active, updateElement],
+  );
+
+  const sendBackward = useCallback(
+    (id: string) => {
+      if (!active) return;
+      const min = active.elements.reduce((m, e) => Math.min(m, e.z ?? 0), 0);
+      updateElement(id, { z: min - 1 });
+    },
+    [active, updateElement],
+  );
+
+  const addElement = useCallback(
+    (kind: SceneElement["kind"]) => {
+      if (!active) return;
+      const base: SceneElement = {
+        id: uid(),
+        kind,
+        x: 0.5,
+        y: 0.5,
+        w: 0.4,
+        h: kind === "text" ? 0.15 : 0.4,
+        rotation: 0,
+        z: (active.elements.reduce((m, e) => Math.max(m, e.z ?? 0), 0) ?? 0) + 1,
+        opacity: 1,
+        visible: true,
+        ...(kind === "text" ? { text: "Текст", fontSize: 32, color: "#ffffff" } : {}),
+        ...(kind === "shape" ? { fill: "#22d3ee", shape: "rect" } : {}),
+      };
+      updateProject(active.id, { elements: [...active.elements, base] });
+      setSelectedElementId(base.id);
+      setElementInspectorOpen(true);
+    },
+    [active, updateProject],
+  );
+
   if (!hydrated || !active) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -566,15 +634,102 @@ export function App() {
                 assetUrls={assetUrls}
                 onError={onSceneError}
                 onTogglePlay={() => setPlaying((p) => !p)}
-              />
+                busy={busy}
+              >
+                <ElementOverlay
+                  project={active}
+                  assetUrls={assetUrls}
+                  interactive
+                  selectedId={selectedElementId}
+                  onSelect={(id) => {
+                    setSelectedElementId(id);
+                    if (id) setElementInspectorOpen(true);
+                  }}
+                  onUpdate={updateElement}
+                  onRemove={removeElement}
+                />
+              </Preview>
+              {/* Element toolbar */}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    if (active.elements.length && !elementInspectorOpen)
+                      setElementInspectorOpen(true);
+                    setSelectedElementId(active.elements[active.elements.length - 1]?.id ?? null);
+                  }}
+                  title="Показать панель элементов"
+                  className="rounded-full border border-border/50 bg-surface-2/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+                >
+                  Элементы ({active.elements.length})
+                </button>
+                <button
+                  onClick={() => addElement("text")}
+                  className="flex items-center gap-1 rounded-full border border-border/50 bg-surface-2/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+                >
+                  ✚ Текст
+                </button>
+                <button
+                  onClick={() => addElement("shape")}
+                  className="flex items-center gap-1 rounded-full border border-border/50 bg-surface-2/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+                >
+                  ✚ Фигура
+                </button>
+                <button
+                  onClick={() => {
+                    if (!active.assets.length) {
+                      toast.warning("Сначала добавьте изображение в библиотеку");
+                      return;
+                    }
+                    const a = active.assets.find((x) => x.kind === "image");
+                    if (!a) {
+                      toast.warning("Нет изображений в библиотеке");
+                      return;
+                    }
+                    const base: SceneElement = {
+                      id: uid(),
+                      kind: "image",
+                      x: 0.5,
+                      y: 0.5,
+                      w: 0.5,
+                      h: 0.5,
+                      rotation: 0,
+                      z: (active.elements.reduce((m, e) => Math.max(m, e.z ?? 0), 0) ?? 0) + 1,
+                      assetId: a.id,
+                      objectFit: "contain",
+                      opacity: 1,
+                      visible: true,
+                    };
+                    updateProject(active.id, { elements: [...active.elements, base] });
+                    setSelectedElementId(base.id);
+                    setElementInspectorOpen(true);
+                  }}
+                  className="flex items-center gap-1 rounded-full border border-border/50 bg-surface-2/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+                >
+                  ✚ Изображение
+                </button>
+              </div>
             </div>
-            <div className="hidden h-[300px] w-[200px] flex-shrink-0 overflow-hidden rounded-2xl border border-border/30 bg-surface/60 backdrop-blur-sm sm:block">
-              <Library
-                assets={active.assets}
-                assetUrls={assetUrls}
-                onRemove={removeAsset}
-                onAttach={handleAttach}
-              />
+            <div className="hidden w-[200px] flex-shrink-0 overflow-hidden rounded-2xl border border-border/30 bg-surface/60 backdrop-blur-sm sm:block lg:w-[220px]">
+              {elementInspectorOpen && selectedElementId ? (
+                <ElementInspector
+                  open
+                  onClose={() => setElementInspectorOpen(false)}
+                  project={active}
+                  selectedId={selectedElementId}
+                  onSelect={setSelectedElementId}
+                  onUpdate={updateElement}
+                  onRemove={removeElement}
+                  onBringForward={bringForward}
+                  onSendBackward={sendBackward}
+                />
+              ) : (
+                <Library
+                  assets={active.assets}
+                  assetUrls={assetUrls}
+                  onRemove={removeAsset}
+                  onAttach={handleAttach}
+                />
+              )}
             </div>
           </div>
 

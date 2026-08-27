@@ -48,6 +48,37 @@ export type ChatMessage = {
   at: number;
 };
 
+export type ListElementKind = "text" | "image" | "shape";
+
+export type SceneElement = {
+  id: string;
+  kind: ListElementKind;
+  /** positional layout in canvas units (0..1 relative) */
+  x: number; // relative center x (0..1)
+  y: number; // relative center y (0..1)
+  w: number; // relative width (0..1)
+  h: number; // relative height (0..1)
+  rotation: number; // degrees
+  z: number; // stacking order
+  /** text */
+  text?: string;
+  fontSize?: number; // px in canvas units
+  color?: string;
+  fontFamily?: string;
+  bold?: boolean;
+  align?: "left" | "center" | "right";
+  /** image */
+  assetId?: string;
+  objectFit?: "cover" | "contain";
+  /** shape */
+  shape?: "rect" | "circle" | "triangle";
+  fill?: string;
+  radius?: number; // border radius (0..1)
+  opacity?: number;
+  visible?: boolean;
+  lock?: boolean;
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -61,6 +92,8 @@ export type Project = {
   scene: Scene;
   /** user overrides applied over the scene CONFIG */
   config: Record<string, string | number | boolean>;
+  /** user-managed overlay elements (drag & drop / inspector) */
+  elements: SceneElement[];
   assets: Asset[];
   audio: AudioClip[];
   /** AI-authored follow-up ideas shown above the prompt bar */
