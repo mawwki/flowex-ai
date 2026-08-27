@@ -268,26 +268,19 @@ export function CreationWizard({
                         : "border-border/60 hover:border-border hover:shadow-md",
                     )}
                   >
-                    <div
-                      className="relative h-24 overflow-hidden"
-                      style={{
-                        background: `linear-gradient(135deg, ${p.colors[0]}, ${p.colors[1]} 55%, ${p.colors[2]})`,
-                      }}
-                    >
+                    <div className="relative flex h-24 items-center gap-3 overflow-hidden bg-surface-2/60 px-3">
                       <span
-                        className="absolute left-2 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full shadow-lg"
-                        style={{ background: p.colors[2], opacity: 0.85 }}
+                        className="h-3 w-3 shrink-0 rounded-full ring-2 ring-black/10"
+                        style={{ background: p.colors[0] }}
+                        aria-hidden
                       />
-                      <span
-                        className="absolute right-2 top-2 h-8 w-12 rounded-md shadow-md"
-                        style={{ background: p.colors[1], opacity: 0.5 }}
-                      />
-                      <span className="absolute bottom-1.5 left-2 text-[10px] font-bold drop-shadow-sm text-black/60">
-                        Aa
-                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{p.title}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{p.tag}</p>
+                      </div>
                       {draft.styleId === p.id && !draft.fromScratch ? (
-                        <span className="absolute right-1.5 bottom-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-foreground shadow-sm">
-                          <Check className="h-3 w-3" />
+                        <span className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[var(--accent)]">
+                          <Check className="h-3.5 w-3.5" />
                         </span>
                       ) : null}
                     </div>
