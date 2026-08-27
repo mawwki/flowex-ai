@@ -10,12 +10,13 @@ import { PromptBar } from "@/components/flowex/PromptBar";
 import { SettingsDialog } from "@/components/flowex/SettingsDialog";
 import { CodePanel } from "@/components/flowex/CodePanel";
 import { StylePicker } from "@/components/flowex/StylePicker";
+import { CreationWizard, type WizardDraft } from "@/components/flowex/CreationWizard";
 import { Inspector } from "@/components/flowex/Inspector";
 import { Library } from "@/components/flowex/Library";
 import { useFlowexStore, uid, ASPECTS } from "@/lib/flowex/store";
 import { generateScene, generateSuggestions } from "@/lib/flowex/providers";
 import { download, exportVideo } from "@/lib/flowex/export";
-import { assetUrl, delBlob, forgetUrl } from "@/lib/flowex/idb";
+import { assetUrl, delBlob, forgetUrl, putBlob } from "@/lib/flowex/idb";
 import { blobToClip, nextClipStart, processFiles } from "@/lib/flowex/media";
 import {
   moveScene as reorderScene,
@@ -29,7 +30,7 @@ import {
 import { STYLE_PRESETS, STARTER_HINTS } from "@/lib/flowex/styles";
 import { blankScene } from "@/lib/flowex/scenes";
 import type { ConfigMap } from "@/lib/flowex/config";
-import type { AudioClip } from "@/lib/flowex/types";
+import type { AudioClip, Project } from "@/lib/flowex/types";
 
 const clampDur = (d: number) => Math.max(1, Math.min(300, d));
 
@@ -45,6 +46,7 @@ export function App() {
     setSettings,
     updateProject,
     createProject,
+    createProjectWith,
     deleteProject,
     duplicateProject,
   } = store;
@@ -57,6 +59,7 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const sceneErrorRef = useRef("");
@@ -144,43 +147,44 @@ export function App() {
     [settings, updateProject],
   );
 
-  const handlePrompt = async (prompt: string) => {
-    if (!active) return;
+  const handlePrompt = async (prompt: string, target?: Project) => {
+    const project = target ?? active;
+    if (!project) return;
     setBusy(true);
     const id = toast.loading("ИИ пишет код сцены…");
     try {
-      const preset = STYLE_PRESETS.find((s) => s.id === active.styleId);
+      const preset = STYLE_PRESETS.find((s) => s.id === project.styleId);
       const fullPrompt = preset
         ? `${prompt}\n\n[Выбранный стиль: ${preset.title}] ${preset.prompt}`
         : prompt;
       const res = await generateScene({
         settings,
         prompt: fullPrompt,
-        currentJs: active.scene.js,
-        duration: active.duration,
-        aspect: active.aspect,
-        assets: active.assets,
-        audio: active.audio,
+        currentJs: project.scene.js,
+        duration: project.duration,
+        aspect: project.aspect,
+        assets: project.assets,
+        audio: project.audio,
       });
       const patch: Parameters<typeof updateProject>[1] = {
         scene: { js: res.js, css: res.css, html: res.html },
         config: {},
-        suggestions: res.suggestions?.length ? res.suggestions.slice(0, 4) : active.suggestions,
+        suggestions: res.suggestions?.length ? res.suggestions.slice(0, 4) : project.suggestions,
       };
       if (res.duration && res.duration >= 1) patch.duration = clampDur(res.duration);
-      if (res.aspect && ASPECTS[res.aspect] && res.aspect !== active.aspect) {
+      if (res.aspect && ASPECTS[res.aspect] && res.aspect !== project.aspect) {
         patch.aspect = res.aspect;
         patch.width = ASPECTS[res.aspect]!.w;
         patch.height = ASPECTS[res.aspect]!.h;
       }
-      if (active.name === "Untitled" && res.name) patch.name = res.name;
-      const dur = patch.duration ?? active.duration;
+      if (project.name === "Untitled" && res.name) patch.name = res.name;
+      const dur = patch.duration ?? project.duration;
       setTime(0);
       setSeekToken((x) => x + 1);
-      updateProject(active.id, {
+      updateProject(project.id, {
         ...patch,
         messages: [
-          ...active.messages,
+          ...project.messages,
           { id: uid(), role: "user", content: prompt, at: Date.now() },
           {
             id: uid(),
@@ -195,7 +199,7 @@ export function App() {
         description: `${dur.toFixed(0)} с · ${res.notes ? res.notes.slice(0, 90) : ""}`.trim(),
       });
       if (!res.suggestions?.length && res.js) {
-        refreshSuggestions(active.id, res.js, prompt);
+        refreshSuggestions(project.id, res.js, prompt);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Не удалось сгенерировать сцену", { id });
@@ -371,6 +375,66 @@ export function App() {
     toast.error("Ошибка в коде сцены", { description: message.slice(0, 140) });
   }, []);
 
+  const handleWizardCreate = async (draft: WizardDraft) => {
+    setWizardOpen(false);
+    // 1. Generate the prompt from the draft
+    const preset = STYLE_PRESETS.find((s) => s.id === draft.styleId);
+    const promptParts: string[] = [];
+    if (preset) {
+      promptParts.push(`Стиль: ${preset.title} — ${preset.prompt}`);
+    } else if (draft.fromScratch) {
+      promptParts.push("Свободный стиль — рисуй всё кодом, без шаблона.");
+    }
+    if (draft.title.trim()) promptParts.push(`Заголовок ролика: ${draft.title.trim()}`);
+    if (draft.description.trim()) promptParts.push(`Идея: ${draft.description.trim()}`);
+    if (draft.points.trim()) {
+      const list = draft.points
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 12);
+      if (list.length) promptParts.push(`Ключевые пункты (покажи по очереди): ${list.join(" | ")}`);
+    }
+    if (draft.prompt.trim()) promptParts.push(`Дополнительно: ${draft.prompt.trim()}`);
+    const finalPrompt = promptParts.join("\n");
+
+    // 2. Attach files first (so assets exist for generation)
+    let assets: Project["assets"] = [];
+    let audio: Project["audio"] = [];
+    if (draft.files.length) {
+      const id = toast.loading(`Прикрепляю файлы (${draft.files.length})…`);
+      try {
+        const result = await processFiles(draft.files, {
+          takenNames: [],
+          startAt: 0,
+          projectDuration: draft.duration || 15,
+        });
+        assets = result.assets;
+        audio = result.clips;
+        if (result.failed.length) toast.warning(`Пропущены: ${result.failed.join(", ")}`);
+      } catch {
+        toast.error("Не удалось прикрепить файлы");
+      } finally {
+        toast.dismiss(id);
+      }
+    }
+
+    // 3. Create the project with assets
+    const project = createProjectWith({
+      name: draft.title.trim() || preset?.title || "Untitled",
+      aspect: draft.aspect,
+      duration: draft.duration,
+      ...(draft.styleId ? { styleId: draft.styleId } : {}),
+      assets,
+      audio,
+    });
+
+    // 4. Kick off scene generation against the freshly-created project
+    if (finalPrompt.trim()) {
+      await handlePrompt(finalPrompt, project);
+    }
+  };
+
   if (!hydrated || !active) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -394,7 +458,7 @@ export function App() {
     projects,
     activeId,
     onSelect: setActiveId,
-    onCreate: createProject,
+    onCreate: () => setWizardOpen(true),
     onDelete: deleteProject,
     onDuplicate: duplicateProject,
     onRename: (id: string, name: string) => updateProject(id, { name }),
@@ -602,6 +666,12 @@ export function App() {
         onClose={() => setInspectorOpen(false)}
         project={active}
         onChange={(config: ConfigMap) => updateProject(active.id, { config })}
+      />
+      <CreationWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        settings={settings}
+        onCreate={handleWizardCreate}
       />
     </div>
   );

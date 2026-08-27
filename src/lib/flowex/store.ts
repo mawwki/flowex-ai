@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Project, Settings } from "./types";
 import { blankScene, citySkyline, mountainSunset, oceanWaves } from "./scenes";
+import { STYLE_PRESETS as STYLE_PRESETS2 } from "./styles";
 
 const P_KEY = "flowex.projects.v1";
 const S_KEY = "flowex.settings.v1";
@@ -167,6 +168,46 @@ export function useFlowexStore() {
     return p;
   }, []);
 
+  /** Creates a project with an explicit style preset / aspect / duration. */
+  const createProjectWith = useCallback(
+    (opts: {
+      name?: string;
+      aspect?: string;
+      duration?: number;
+      styleId?: string;
+      assets?: Project["assets"];
+      audio?: Project["audio"];
+    }) => {
+      const preset = opts.styleId ? STYLE_PRESETS2.find((s) => s.id === opts.styleId) : undefined;
+      const aspect = (opts.aspect ?? preset?.aspect ?? "16:9") as keyof typeof ASPECTS | string;
+      const size = ASPECTS[aspect] ?? ASPECTS["16:9"]!;
+      const duration = opts.duration ?? preset?.duration ?? 15;
+      const p: Project = {
+        id: uid(),
+        name: opts.name?.trim() || (preset ? preset.title : "Untitled"),
+        duration,
+        fps: 30,
+        width: size.w,
+        height: size.h,
+        quality: "1080p",
+        aspect,
+        scene: blankScene,
+        config: {},
+        assets: opts.assets ?? [],
+        audio: opts.audio ?? [],
+        suggestions: [],
+        styleId: opts.styleId,
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      setProjects((prev) => [p, ...prev]);
+      setActiveId(p.id);
+      return p;
+    },
+    [],
+  );
+
   const deleteProject = useCallback((id: string) => {
     setProjects((prev) => {
       const next = prev.filter((p) => p.id !== id);
@@ -202,6 +243,7 @@ export function useFlowexStore() {
     setSettings,
     updateProject,
     createProject,
+    createProjectWith,
     deleteProject,
     duplicateProject,
   };
