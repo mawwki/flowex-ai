@@ -4,6 +4,76 @@ import { overrideSnippet } from "./config";
 
 export type AssetUrlMap = Record<string, string>;
 
+/**
+ * Builds a shared snippet that draws user overlay elements (text / image / shape)
+ * on top of the scene canvas. Used both by the live preview sandbox and by the
+ * video exporter so drag-and-drop elements are baked into the recorded frame.
+ */
+export function elementsSnippet(project: Project): string {
+  const els = project.elements ?? [];
+  if (!els.length) return "";
+  const j = JSON.stringify(els);
+  const idName: Record<string, string> = {};
+  for (const a of project.assets) if (a.kind !== "audio") idName[a.id] = a.name;
+  const idMap = JSON.stringify(idName);
+  return `
+var __elemIdName=${idMap};
+function __assetByUid(id){return ASSETS[__elemIdName[id]]||null;}
+var E=${j};
+function __setElements(list){E=list||[];}
+function paintElements(ctx,w,h){
+  var list=E.slice();list.sort(function(a,b){return (a.z||0)-(b.z||0);});
+  for(var i=0;i<list.length;i++){var e=list[i];
+    if(e.visible===false)continue;
+    var cx=e.x*w, cy=e.y*h, ew=e.w*w, eh=e.h*h;
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.rotate((e.rotation||0)*Math.PI/180);
+    ctx.globalAlpha*=(e.opacity==null?1:e.opacity);
+    if(e.kind==='text'){
+      var fs=(e.fontSize||24)*h/720;
+      ctx.font=(e.bold?'700 ':'400 ')+fs+'px '+(e.fontFamily?e.fontFamily.replace(/"/g,''):'sans-serif')+',sans-serif';
+      ctx.fillStyle=e.color||'#fff';
+      ctx.textAlign=e.align==='left'?'left':e.align==='right'?'right':'center';
+      ctx.textBaseline='middle';
+      var lines=String(e.text||'').split('\\n');
+      var lh=fs*1.15;
+      for(var l=0;l<lines.length;l++){
+        ctx.fillText(lines[l],0,(l-lines.length/2+0.5)*lh);
+      }
+    }else if(e.kind==='image'){
+      var el=__assetByUid(e.assetId);
+      if(el&&el.width){
+        var fit=e.objectFit||'cover';
+        var sr=el.width/el.height, tr=ew/eh, dw=ew, dh=eh, dx=-ew/2, dy=-eh/2;
+        if(fit==='cover'){ if(sr>tr){dh=ew/sr;dy=-dh/2;} else {dw=eh*sr;dx=-dw/2;} }
+        else { if(sr>tr){dw=eh*sr;dx=-dw/2;} else {dh=ew/sr;dy=-dh/2;} }
+        ctx.drawImage(el,dx,dy,dw,dh);
+      }
+    }else if(e.kind==='shape'){
+      ctx.fillStyle=e.fill||'#22d3ee';
+      if(e.shape==='circle'){ctx.beginPath();ctx.arc(0,0,Math.min(ew,eh)/2,0,Math.PI*2);ctx.fill();}
+      else if(e.shape==='triangle'){
+        ctx.beginPath();ctx.moveTo(0,-eh/2);ctx.lineTo(ew/2,eh/2);ctx.lineTo(-ew/2,eh/2);ctx.closePath();ctx.fill();
+      }else{
+        var r=(e.radius==null?0:Math.min(e.radius*Math.min(ew,eh),Math.min(ew,eh)/2));
+        ctx.beginPath();
+        if(r>0){roundRectPath(ctx,-ew/2,-eh/2,ew,eh,r);ctx.fill();}
+        else ctx.fillRect(-ew/2,-eh/2,ew,eh);
+      }
+    }
+    ctx.restore();
+  }
+}
+function roundRectPath(ctx,x,y,w,h,r){
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();
+}
+`;
+}
+
 /** Code that builds the ASSETS map inside the sandbox. */
 function assetsSnippet(project: Project, urls: AssetUrlMap): string {
   const list = project.assets
@@ -38,6 +108,7 @@ ${scene.css}
 <div id="stage"><canvas id="c" width="${width}" height="${height}"></canvas><div id="overlay">${scene.html}</div></div>
 <script>
 ${FX_RUNTIME}
+${elementsSnippet(project)}
 var __err=null;
 try{
 ${assetsSnippet(project, urls)}
@@ -68,7 +139,9 @@ ${overrideSnippet(project.config)}
       ctx.fillText('Ошибка сцены: '+(__err||'нет drawFrame'),c.width/2,c.height/2);
       return;
     }
-    try{ drawFrame(ctx,t,c.width,c.height); }catch(e){ __err=String(e); }
+    try{ drawFrame(ctx,t,c.width,c.height);
+      if(typeof paintElements==='function')paintElements(ctx,c.width,c.height);}
+      catch(e){ __err=String(e); }
   }
   function loop(ts){
     if(playing){
@@ -90,6 +163,7 @@ ${overrideSnippet(project.config)}
     if(d.type==='seek'){t=Math.max(0,Math.min(DUR,d.t));last=null;syncVideos();paint();
       parent.postMessage({source:'flowex',type:'time',t:t},'*');}
     if(d.type==='renderAt'){t=d.t;paint();}
+    if(d.type==='elements'&&typeof __setElements==='function'){__setElements(d.list);paint();}
   });
   parent.postMessage({source:'flowex',type:'ready',error:__err},'*');
 })();

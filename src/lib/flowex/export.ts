@@ -1,6 +1,7 @@
 import type { Project } from "./types";
 import { FX_RUNTIME } from "./fx";
 import { overrideSnippet } from "./config";
+import { elementsSnippet } from "./stage";
 import { getBlob } from "./idb";
 
 function pickMime(withAudio: boolean): string {
@@ -71,7 +72,8 @@ export async function exportVideo(
     `${FX_RUNTIME}
      ${project.scene.js}
      ${overrideSnippet(project.config)}
-     return typeof drawFrame==='function'?drawFrame:null;`,
+     ${elementsSnippet(project)}
+     return function(c,t,w,h){drawFrame(c,t,w,h);if(typeof paintElements==='function')paintElements(c,w,h);};`,
   )(assets, (n: string) => assets[n] ?? null) as Draw | null;
   if (!drawFrame) throw new Error("В коде сцены нет функции drawFrame");
 

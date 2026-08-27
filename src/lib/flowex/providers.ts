@@ -455,13 +455,19 @@ export async function generateScene(opts: {
     assetTask,
     audioLine,
     `Запрос пользователя: ${prompt}`,
+    `Сохрани формат кадра ${aspect} (не меняй его) и сделай длительность ${duration} сек, разбив на сцены SCENES так, чтобы FX.total(SCENES)===${duration}. Меняй длительность только если сам запрос явно требует другую.`,
     "Если для запроса нужна другая длительность — верни новое значение duration и согласованный SCENES.",
   ]
     .filter(Boolean)
     .join("\n");
 
   return extractJson(
-    await chat({ settings, system: `${SYSTEM_PROMPT}\n\n${FX_DOCS}`, user: userContent }),
+    await chat({
+      settings,
+      system: `${SYSTEM_PROMPT}\n\n${FX_DOCS}`,
+      user: userContent,
+      maxTokens: 16000,
+    }),
   );
 }
 

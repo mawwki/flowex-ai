@@ -176,11 +176,6 @@ export function App() {
         suggestions: res.suggestions?.length ? res.suggestions.slice(0, 4) : project.suggestions,
       };
       if (res.duration && res.duration >= 1) patch.duration = clampDur(res.duration);
-      if (res.aspect && ASPECTS[res.aspect] && res.aspect !== project.aspect) {
-        patch.aspect = res.aspect;
-        patch.width = ASPECTS[res.aspect]!.w;
-        patch.height = ASPECTS[res.aspect]!.h;
-      }
       if (project.name === "Untitled" && res.name) patch.name = res.name;
       const dur = patch.duration ?? project.duration;
       setTime(0);
@@ -638,7 +633,6 @@ export function App() {
               >
                 <ElementOverlay
                   project={active}
-                  assetUrls={assetUrls}
                   interactive
                   selectedId={selectedElementId}
                   onSelect={(id) => {

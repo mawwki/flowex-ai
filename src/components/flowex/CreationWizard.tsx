@@ -424,6 +424,46 @@ export function CreationWizard({
                 </pre>
               </div>
 
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-border/40 bg-surface-2/30 p-3">
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Формат кадра</p>
+                  <div className="flex gap-1.5">
+                    {(["16:9", "9:16", "1:1"] as const).map((a) => (
+                      <button
+                        key={a}
+                        onClick={() => setDraft((d) => ({ ...d, aspect: a }))}
+                        className={cn(
+                          "flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors",
+                          draft.aspect === a
+                            ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                            : "border-border/50 text-muted-foreground hover:bg-surface-2",
+                        )}
+                      >
+                        {a}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border/40 bg-surface-2/30 p-3">
+                  <label className="mb-2 block text-xs font-medium text-muted-foreground">
+                    Длительность · {draft.duration}с
+                  </label>
+                  <input
+                    type="range"
+                    min={5}
+                    max={60}
+                    step={1}
+                    value={draft.duration}
+                    onChange={(e) => setDraft((d) => ({ ...d, duration: Number(e.target.value) }))}
+                    className="w-full"
+                  />
+                  <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                    <span>5с</span>
+                    <span>60с</span>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-xl border border-border/40 bg-surface-2/30 p-3 text-center">
                   <Frame className="mx-auto mb-1 h-4 w-4 text-muted-foreground" />

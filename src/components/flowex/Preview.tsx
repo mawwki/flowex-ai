@@ -73,6 +73,13 @@ export function Preview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seekToken, doc, post]);
 
+  // Push user overlay elements into the sandbox whenever they change so the
+  // canvas (and the recorded export) match drag-and-drop edits without reloading.
+  useEffect(() => {
+    post({ type: "elements", list: project.elements ?? [] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.elements, doc, post]);
+
   // Keep real audio clips in sync with the playhead.
   useEffect(() => {
     const els = audioRefs.current;

@@ -1,7 +1,14 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as RPointerEvent,
+} from "react";
 import type { Project, SceneElement } from "@/lib/flowex/types";
 import { cn } from "@/lib/utils";
-import { assetUrl } from "@/lib/flowex/idb";
 
 type Draft = {
   x: number;
@@ -12,7 +19,6 @@ type Draft = {
 
 export function ElementOverlay({
   project,
-  assetUrls,
   interactive,
   onSelect,
   onUpdate,
@@ -20,7 +26,6 @@ export function ElementOverlay({
   selectedId,
 }: {
   project: Project;
-  assetUrls: Record<string, string>;
   interactive: boolean;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
@@ -36,8 +41,8 @@ export function ElementOverlay({
   const dragState = useRef(drag);
   dragState.current = drag;
 
-  const styleFor = useCallback((el: SceneElement) => {
-    const base: React.CSSProperties = {
+  const styleFor = useCallback((el: SceneElement): CSSProperties => {
+    const base: CSSProperties = {
       left: `${el.x * 100}%`,
       top: `${el.y * 100}%`,
       width: `${el.w * 100}%`,
@@ -50,7 +55,7 @@ export function ElementOverlay({
   }, []);
 
   const onPointerDown = useCallback(
-    (e: React.PointerEvent, el: SceneElement) => {
+    (e: RPointerEvent, el: SceneElement) => {
       if (!interactive || el.lock) return;
       e.preventDefault();
       e.stopPropagation();
@@ -67,7 +72,7 @@ export function ElementOverlay({
   );
 
   const onResizePointerDown = useCallback(
-    (e: React.PointerEvent, el: SceneElement) => {
+    (e: RPointerEvent, el: SceneElement) => {
       if (!interactive || el.lock) return;
       e.preventDefault();
       e.stopPropagation();
@@ -99,14 +104,10 @@ export function ElementOverlay({
     [onUpdate],
   );
 
-  const handlePointerUp = useCallback(() => setDrag(null), []);
-
-  // Attach global move/up listeners while dragging
-  useMemo(() => {
+  // Attach global move/up listeners while dragging.
+  useEffect(() => {
     if (!drag) return;
-    const move = (e: PointerEvent) => {
-      if (dragState.current?.mode === "move") handlePointerMove(e);
-    };
+    const move = (e: PointerEvent) => handlePointerMove(e);
     const up = () => setDrag(null);
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -133,11 +134,10 @@ export function ElementOverlay({
               "absolute",
               interactive && "cursor-move pointer-events-auto",
               selected && "ring-2 ring-[var(--accent)]",
-              interactive && !el.lock && "hover:ring-1 hover:ring-[var(--accent)]/50",
+              interactive && !el.lock && "hover:ring-1 hover:ring-[var(--accent)]/40",
             )}
             onPointerDown={(e) => onPointerDown(e, el)}
           >
-            <ElementContent el={el} assetUrl={assetUrls[el.assetId ?? ""]} />
             {selected && interactive ? (
               <>
                 <div
@@ -160,68 +160,6 @@ export function ElementOverlay({
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function ElementContent({ el, assetUrl: url }: { el: SceneElement; assetUrl: string | undefined }) {
-  if (el.kind === "image") {
-    return url ? (
-      <img
-        src={url}
-        alt=""
-        style={{ objectFit: el.objectFit ?? "cover", width: "100%", height: "100%" }}
-        draggable={false}
-        className="pointer-events-none"
-      />
-    ) : (
-      <div className="flex h-full w-full items-center justify-center bg-surface-2 text-xs text-muted-foreground">
-        🖼
-      </div>
-    );
-  }
-  if (el.kind === "shape") {
-    const shapeStyle: React.CSSProperties = {
-      width: "100%",
-      height: "100%",
-      background: el.fill ?? "#22d3ee",
-      opacity: el.opacity ?? 1,
-    };
-    if (el.shape === "circle") shapeStyle.borderRadius = "50%";
-    else if (el.radius !== undefined && el.radius > 0)
-      shapeStyle.borderRadius = `${el.radius * 100}%`;
-    else if (el.shape === "triangle") {
-      // triangle via clip-path
-      shapeStyle.background = "none";
-      shapeStyle.clipPath = "polygon(50% 0, 100% 100%, 0 100%)";
-      // need background on a wrapper, so render differently
-    }
-    if (el.shape === "triangle") {
-      return (
-        <div
-          className="pointer-events-none h-full w-full"
-          style={{
-            clipPath: "polygon(50% 0, 100% 100%, 0 100%)",
-            background: el.fill ?? "#f59e0b",
-          }}
-        />
-      );
-    }
-    return <div className="pointer-events-none h-full w-full" style={shapeStyle} />;
-  }
-  // text
-  return (
-    <div
-      className="pointer-events-none flex h-full w-full items-center justify-center overflow-hidden"
-      style={{
-        fontSize: `${el.fontSize ?? 24}px`,
-        color: el.color ?? "#fff",
-        fontFamily: el.fontFamily,
-        fontWeight: el.bold ? 700 : 400,
-        textAlign: el.align ?? "center",
-      }}
-    >
-      <span className="whitespace-pre-wrap break-words">{el.text}</span>
     </div>
   );
 }
