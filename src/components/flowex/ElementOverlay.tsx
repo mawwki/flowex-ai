@@ -7,6 +7,7 @@ import {
   type CSSProperties,
   type PointerEvent as RPointerEvent,
 } from "react";
+import { X } from "lucide-react";
 import type { Project, SceneElement } from "@/lib/flowex/types";
 import { cn } from "@/lib/utils";
 
@@ -150,10 +151,10 @@ export function ElementOverlay({
                     e.stopPropagation();
                     onRemove(el.id);
                   }}
-                  className="absolute -top-3 -right-3 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white text-xs ring-2 ring-white/30"
+                  className="absolute -top-3 -right-3 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white ring-2 ring-white/30"
                   title="Удалить"
                 >
-                  ×
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </>
             ) : null}

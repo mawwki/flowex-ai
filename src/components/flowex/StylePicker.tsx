@@ -17,7 +17,7 @@ function StyleCard({
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        "w-[180px] shrink-0 snap-start overflow-hidden rounded-2xl border text-left transition-all duration-200",
+        "group w-[180px] shrink-0 snap-start overflow-hidden rounded-2xl border text-left transition-all duration-200",
         selected
           ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30 shadow-lg shadow-[var(--accent)]/10 scale-[1.02]"
           : "border-border/60 hover:border-border hover:ring-1 hover:ring-border/50 hover:shadow-md hover:shadow-black/10 hover:scale-[1.01]",

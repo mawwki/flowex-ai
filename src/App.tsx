@@ -1,7 +1,18 @@
 import { Toaster } from "@/components/ui/sonner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Code2, Download, Loader2, Menu, Moon, Settings, Sun } from "lucide-react";
+import {
+  Code2,
+  Download,
+  Image as ImageIcon,
+  Loader2,
+  Menu,
+  Moon,
+  Settings,
+  Square,
+  Sun,
+  Type,
+} from "lucide-react";
 import { Sidebar } from "@/components/flowex/Sidebar";
 import { Preview } from "@/components/flowex/Preview";
 import { PlaybackBar } from "@/components/flowex/PlaybackBar";
@@ -612,7 +623,6 @@ export function App() {
                 <Sun className="h-5 w-5" />
               )}
             </button>
-            <div className="ml-1 h-9 w-9 overflow-hidden rounded-full bg-gradient-to-br from-[var(--accent)] to-surface-2 ring-1 ring-border/50" />
           </div>
         </header>
 
@@ -660,13 +670,13 @@ export function App() {
                   onClick={() => addElement("text")}
                   className="flex items-center gap-1 rounded-full border border-border/50 bg-surface-2/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
                 >
-                  ✚ Текст
+                  <Type className="h-3.5 w-3.5" /> Текст
                 </button>
                 <button
                   onClick={() => addElement("shape")}
                   className="flex items-center gap-1 rounded-full border border-border/50 bg-surface-2/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
                 >
-                  ✚ Фигура
+                  <Square className="h-3.5 w-3.5" /> Фигура
                 </button>
                 <button
                   onClick={() => {
@@ -699,7 +709,7 @@ export function App() {
                   }}
                   className="flex items-center gap-1 rounded-full border border-border/50 bg-surface-2/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
                 >
-                  ✚ Изображение
+                  <ImageIcon className="h-3.5 w-3.5" /> Изображение
                 </button>
               </div>
             </div>

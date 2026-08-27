@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Pause, Play } from "lucide-react";
 import type { Project } from "@/lib/flowex/types";
 import { buildStageDoc } from "@/lib/flowex/stage";
 import { cn } from "@/lib/utils";
@@ -181,8 +182,9 @@ export function Preview({
               </button>
 
               {/* Time label at bottom-right */}
-              <span className="pointer-events-none absolute right-3 bottom-3 z-10 rounded-full bg-black/50 px-2.5 py-1 font-mono text-[11px] text-white/80 backdrop-blur-sm tabular-nums">
-                {playing ? "▶" : "⏸"} {time.toFixed(1)}с
+              <span className="pointer-events-none absolute right-3 bottom-3 z-10 flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 font-mono text-[11px] text-white/80 backdrop-blur-sm tabular-nums">
+                {playing ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                {time.toFixed(1)}с
               </span>
             </>
           ) : null}
